@@ -1,0 +1,186 @@
+// SQLite for local/dev. To move to Postgres: change provider to "postgresql",
+// point DATABASE_URL at your database, and run `npx prisma db push` (or migrate).
+// JSON-like fields are stored as String (JSON.stringify) so the schema works on both.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id           String      @id @default(cuid())
+  slug         String      @unique
+  name         String
+  brand        String
+  category     String // SOUND | GROUND | SKY_SHOTS | SPARKLERS | FOUNTAINS
+  unit         String // box | pack | piece
+  price        Int // sale price in INR (after discount)
+  mrp          Int // MRP in INR (shown struck-through)
+  priceNote    String? // internal note for owner, e.g. "Listed range 450–500"
+  stock        Int         @default(100)
+  images       String      @default("[]") // JSON array of image URLs
+  shortDesc    String      @default("")
+  description  String      @default("")
+  contents     String? // e.g. "10 pieces per box"
+  safetyInfo   String      @default("")
+  isGreen      Boolean     @default(false)
+  isBestSeller Boolean     @default(false)
+  isFeatured   Boolean     @default(false)
+  isVisible    Boolean     @default(true)
+  minQty       Int         @default(1)
+  qtyStep      Int         @default(1)
+  sortOrder    Int         @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  comboItems   ComboItem[]
+}
+
+model Combo {
+  id              String      @id @default(cuid())
+  slug            String      @unique
+  name            String
+  tagline         String      @default("")
+  description     String      @default("")
+  image           String
+  extraDiscount   Int         @default(10) // extra % off on top of product sale prices
+  isVisible       Boolean     @default(true)
+  sortOrder       Int         @default(0)
+  items           ComboItem[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model ComboItem {
+  id        String  @id @default(cuid())
+  comboId   String
+  productId String
+  qty       Int
+  combo     Combo   @relation(fields: [comboId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Coupon {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  type        String // PERCENT | FLAT
+  value       Int
+  minOrder    Int       @default(0)
+  maxDiscount Int? // cap for PERCENT coupons
+  expiresAt   DateTime?
+  active      Boolean   @default(true)
+  usageCount  Int       @default(0)
+  createdAt   DateTime  @default(now())
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  name      String
+  email     String?
+  city      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+}
+
+model Order {
+  id                String      @id @default(cuid())
+  orderNumber       String      @unique
+  customerId        String?
+  customer          Customer?   @relation(fields: [customerId], references: [id])
+  name              String
+  phone             String
+  email             String?
+  address1          String
+  address2          String?
+  city              String
+  state             String
+  pincode           String
+  notes             String?
+  deliveryMode      String      @default("DELIVERY") // DELIVERY | PICKUP
+  subtotal          Int
+  mrpTotal          Int
+  couponCode        String?
+  couponDiscount    Int         @default(0)
+  autoDiscount      Int         @default(0)
+  shippingFee       Int         @default(0)
+  total             Int
+  paymentMethod     String // RAZORPAY | UPI | COD
+  paymentStatus     String      @default("PENDING") // PENDING | AWAITING_VERIFICATION | PAID | FAILED | REFUNDED
+  upiRef            String?
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  status            String      @default("NEW") // NEW | CONFIRMED | PACKED | SHIPPED | DELIVERED | CANCELLED
+  adminNote         String?
+  items             OrderItem[]
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  kind      String // PRODUCT | COMBO
+  refId     String
+  name      String
+  image     String?
+  unit      String
+  unitPrice Int
+  unitMrp   Int
+  qty       Int
+  lineTotal Int
+}
+
+model Quote {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  email     String?
+  city      String
+  items     String   @default("[]") // JSON [{product, qty}]
+  message   String?
+  status    String   @default("NEW") // NEW | CONTACTED | CLOSED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Single row (id = 1) holding all owner-editable site/offer settings.
+model Settings {
+  id                   Int      @id @default(1)
+  storeName            String   @default("Sivakasi Sparkle Crackers")
+  announcement         String   @default("")
+  highlightCoupon      String   @default("")
+  heroTitle            String   @default("MEGA PRE-DIWALI SALE: UP TO 70% OFF")
+  heroSubtitle         String   @default("")
+  maxDiscountPercent   Int      @default(70)
+  taglines             String   @default("[]") // JSON string[]
+  diwaliDate           DateTime
+  autoOfferThreshold   Int      @default(3000) // extra off on orders above this
+  autoOfferPercent     Int      @default(5)
+  shippingFee          Int      @default(150)
+  freeShippingAbove    Int      @default(2000)
+  minOrderValue        Int      @default(500)
+  codEnabled           Boolean  @default(true)
+  upiEnabled           Boolean  @default(true)
+  upiId                String   @default("")
+  upiPayeeName         String   @default("")
+  whatsappNumber       String   @default("")
+  phone                String   @default("")
+  email                String   @default("")
+  address              String   @default("")
+  licenceNumber        String   @default("")
+  restrictionEnabled   Boolean  @default(true)
+  restrictionNotice    String   @default("")
+  blockedPincodePrefixes String @default("") // comma separated, e.g. "110,121,122,201"
+  serviceablePrefixes  String   @default("") // comma separated; empty = all others allowed
+  seoCities            String   @default("") // comma separated local SEO cities
+  updatedAt            DateTime @updatedAt
+}
