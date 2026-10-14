@@ -16,11 +16,12 @@ export function CouponForm() {
         <select name="type" className="input">
           <option value="PERCENT">% off</option>
           <option value="FLAT">Flat ₹</option>
+          <option value="FREESHIP">Free delivery</option>
         </select>
       </label>
       <label>
         <span className="label">Value</span>
-        <input name="value" type="number" min={1} className="input" required />
+        <input name="value" type="number" min={0} className="input" placeholder="0 for free delivery" />
       </label>
       <label>
         <span className="label">Min order ₹</span>

@@ -11,7 +11,8 @@
     "images": "node scripts/optimize-images.mjs",
     "db:push": "prisma db push",
     "seed": "tsx prisma/seed.ts",
-    "setup": "npm run images && prisma db push && npm run seed"
+    "setup": "npm run images && prisma db push && npm run seed",
+    "videos": "node scripts/encode-videos.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

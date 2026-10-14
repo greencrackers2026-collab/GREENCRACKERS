@@ -26,7 +26,7 @@ export default async function QuotePage() {
         Buying for a shop, apartment, company or temple festival? Tell us what you need and we&apos;ll send our best Sivakasi
         wholesale price.
       </p>
-      <QuoteForm productOptions={options} whatsappNumber={s.whatsappNumber} storeName={s.storeName} />
+      <QuoteForm productOptions={options} storeName={s.storeName} />
     </div>
   );
 }

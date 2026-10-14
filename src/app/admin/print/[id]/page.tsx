@@ -106,6 +106,12 @@ export default async function PrintPage({ params, searchParams }: { params: Prom
               <dt>Delivery</dt>
               <dd>{formatINR(o.shippingFee)}</dd>
             </div>
+            {o.codFee > 0 && (
+              <div className="flex justify-between">
+                <dt>COD charges</dt>
+                <dd>{formatINR(o.codFee)}</dd>
+              </div>
+            )}
             <div className="flex justify-between border-t border-black pt-1 text-base font-bold">
               <dt>Total</dt>
               <dd>{formatINR(o.total)}</dd>

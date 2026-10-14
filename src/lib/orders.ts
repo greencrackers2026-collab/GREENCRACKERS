@@ -1,5 +1,8 @@
 import "server-only";
 import { randomInt } from "node:crypto";
+import { access } from "node:fs/promises";
+import path from "node:path";
+import { PROOF_DIR } from "./uploads";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { priceCart } from "./pricing";
@@ -18,7 +21,17 @@ function newOrderNumber() {
 
 export async function createOrder(input: z.infer<typeof checkoutSchema>, s: SiteSettings) {
   if (input.paymentMethod === "COD" && !s.codEnabled) throw new OrderError("Cash on Delivery is not available right now.");
-  if (input.paymentMethod === "UPI" && (!s.upiEnabled || !s.upiId)) throw new OrderError("UPI payment is not available right now.");
+  if (input.paymentMethod === "UPI") {
+    if (!s.upiAvailable) throw new OrderError("UPI payment is not available right now.");
+    if (!input.paymentProof) throw new OrderError("Please upload your UPI payment screenshot.");
+    try {
+      await access(path.join(PROOF_DIR, input.paymentProof));
+    } catch {
+      throw new OrderError("Payment screenshot not found. Please upload it again.");
+    }
+    if (await prisma.order.findFirst({ where: { paymentProof: input.paymentProof }, select: { id: true } }))
+      throw new OrderError("This screenshot is already attached to another order. Please upload your own payment screenshot.");
+  }
   if (input.paymentMethod === "RAZORPAY" && !s.razorpayEnabled) throw new OrderError("Online payment is not available right now.");
 
   if (input.deliveryMode === "DELIVERY") {
@@ -26,7 +39,11 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>, s: Site
     if (!pin.ok) throw new OrderError(pin.reason ?? "We cannot deliver to this pincode.");
   }
 
-  const quote = await priceCart(input.lines, s, { couponCode: input.couponCode, deliveryMode: input.deliveryMode });
+  const quote = await priceCart(input.lines, s, {
+    couponCode: input.couponCode,
+    deliveryMode: input.deliveryMode,
+    paymentMethod: input.paymentMethod,
+  });
   if (quote.errors.length) throw new OrderError(quote.errors[0]);
   if (!quote.lines.length) throw new OrderError("Your cart is empty.");
   if (!quote.meetsMinimum) throw new OrderError(`Minimum order value is ₹${s.minOrderValue}.`);
@@ -40,6 +57,17 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>, s: Site
     if (l.kind === "PRODUCT") demand.set(l.id, (demand.get(l.id) ?? 0) + l.qty);
     else for (const ci of comboItems.filter((c) => c.comboId === l.id)) demand.set(ci.productId, (demand.get(ci.productId) ?? 0) + ci.qty * l.qty);
   }
+
+  // Cost snapshot (admin-only P&L). Combo cost is 0 unless every component has a cost.
+  const costRows = await prisma.product.findMany({ where: { id: { in: [...demand.keys()] } }, select: { id: true, costPrice: true } });
+  const costOf = new Map(costRows.map((r) => [r.id, r.costPrice]));
+  const unitCostOf = (l: { kind: string; id: string }) => {
+    if (l.kind === "PRODUCT") return costOf.get(l.id) ?? 0;
+    const parts = comboItems.filter((c) => c.comboId === l.id);
+    return parts.every((c) => (costOf.get(c.productId) ?? 0) > 0)
+      ? parts.reduce((a, c) => a + (costOf.get(c.productId) ?? 0) * c.qty, 0)
+      : 0;
+  };
 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -75,10 +103,13 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>, s: Site
           couponDiscount: quote.couponDiscount,
           autoDiscount: quote.autoDiscount,
           shippingFee: quote.shippingFee,
+          codFee: quote.codFee,
           total: quote.total,
           paymentMethod: input.paymentMethod,
-          paymentStatus: "PENDING",
+          // UPI orders wait for the admin to check the screenshot before they are confirmed.
+          paymentStatus: input.paymentMethod === "UPI" ? "AWAITING_VERIFICATION" : "PENDING",
           upiRef: input.upiRef || null,
+          paymentProof: input.paymentMethod === "UPI" ? input.paymentProof : null,
           items: {
             create: quote.lines.map((l) => ({
               kind: l.kind,
@@ -88,6 +119,7 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>, s: Site
               unit: l.unit,
               unitPrice: l.unitPrice,
               unitMrp: l.unitMrp,
+              unitCost: unitCostOf(l),
               qty: l.qty,
               lineTotal: l.lineTotal,
             })),

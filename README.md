@@ -1,8 +1,8 @@
-# Diwali Crackers Store
+﻿# Diwali Crackers Store
 
 A fast, SEO-optimised Diwali crackers e-commerce site with a glassmorphism UI, a pre-Diwali offer system, checkout (Razorpay / UPI / COD), bulk quote requests and an admin dashboard.
 
-**Stack:** Next.js 15 (App Router) · TypeScript · Tailwind CSS 4 · Framer Motion · Prisma + SQLite (Postgres-ready) · Razorpay
+**Stack:** Next.js 15 (App Router) Â· TypeScript Â· Tailwind CSS 4 Â· Framer Motion Â· Prisma + SQLite (Postgres-ready) Â· Razorpay
 
 ## Setup
 
@@ -26,7 +26,7 @@ Production: `npm run build && npm start`.
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Admin login |
 | `ADMIN_SESSION_SECRET` | 32+ char random string that signs the admin cookie |
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Razorpay test/live keys. If left blank, the Razorpay option is hidden. |
-| `WHATSAPP_NUMBER`, `UPI_ID`, `DIWALI_DATE` | Seed defaults only; edit them later in **Admin → Offers & Settings** |
+| `WHATSAPP_NUMBER`, `UPI_ID`, `DIWALI_DATE` | Seed defaults only; edit them later in **Admin â†’ Offers & Settings** |
 
 ## Scripts
 
@@ -40,29 +40,28 @@ Production: `npm run build && npm start`.
 ## What's editable from the admin (no code changes)
 
 - **Products:** name, brand, slug, price, MRP (with live % OFF), stock, images (upload), description, safety info, flags (visible / featured / best seller / green), min qty and qty step
-- **Offers & Settings:** hero title, rotating taglines, announcement bar, highlighted coupon, Diwali countdown date, extra-%-off-above-₹X rule, shipping fee and free-shipping threshold, minimum order, COD/UPI toggles, UPI ID, WhatsApp, licence number, restriction banner (toggle + text), blocked/serviceable pincode prefixes, SEO cities
+- **Offers & Settings:** hero title, rotating taglines, announcement bar, highlighted coupon, Diwali countdown date, extra-%-off-above-â‚¹X rule, shipping fee and free-shipping threshold, minimum order, COD/UPI toggles, UPI ID, WhatsApp, licence number, restriction banner (toggle + text), blocked/serviceable pincode prefixes, SEO cities
 - **Coupons:** code, % or flat, minimum order, max discount, expiry, pause/delete
 - **Combos:** name, tagline, extra discount %, visibility. Combo prices are computed from current product prices.
-- **Orders:** search and filter (status / payment / date), status pipeline (New → Confirmed → Packed → Shipped → Delivered / Cancelled), payment status, internal notes, printable invoice and packing slip, CSV export. Cancelling an order returns its stock.
+- **Orders:** search and filter (status / payment / date), status pipeline (New â†’ Confirmed â†’ Packed â†’ Shipped â†’ Delivered / Cancelled), payment status, internal notes, printable invoice and packing slip, CSV export. Cancelling an order returns its stock.
 - **Quotes:** mark New / Contacted / Closed, reply on WhatsApp
 - **Customers:** list with order history and total spent
 
-## Notes for the owner ⚠️
+## Notes for the owner âš ï¸
 
-- **Prices from ranges:** Coconut uses ₹450 (range 450–500), Sky Shot uses ₹650 (range 650–700), Murgachap uses ₹35 (range 35–40). Each one has an internal note in Admin → Products.
-- **MRPs** are set so the discount is 60–68% off. Adjust them per product if your printed MRPs differ.
-- **Small Fuljhadi** uses a placeholder image. Upload a real photo in Admin → Products → Edit.
+- **Prices from ranges:** Coconut uses â‚¹450 (range 450â€“500), Sky Shot uses â‚¹650 (range 650â€“700), Murgachap uses â‚¹35 (range 35â€“40). Each one has an internal note in Admin â†’ Products.
+- **MRPs** are set so the discount is 60â€“68% off. Adjust them per product if your printed MRPs differ.
+- **Small Fuljhadi** uses a placeholder image. Upload a real photo in Admin â†’ Products â†’ Edit.
 - **Green badge:** it is set on products whose pack shows a green-fireworks mark in the photos (Nazi Green, Paanch Awathar, Anar, Big sparklers). Verify against your stock.
-- **Licence number:** replace the placeholder in Admin → Offers & Settings.
-- **Store name / contact details** are placeholders ("Sivakasi Sparkle Crackers", +91 98765 43210). Change them in settings.
-- **Compliance:** Delhi-NCR pincode prefixes (110, 121, 122, 201) are blocked by default. Add others as local rules require. Customers in blocked areas are offered pickup or WhatsApp ordering instead.
+- **Licence number:** add it in Admin â†’ Offers & Settings (shown in the footer and on invoices).
+- **Store details:** store name is "Green Crackers Limited" and WhatsApp/phone is 8920345119. Email, shop address, licence number and UPI ID are blank for now. Add them in settings when ready (the UPI payment option appears once a UPI ID is set).
+- **Delivery area:** no pincodes are blocked and the restriction notice is off; orders are accepted from everywhere and confirmed on WhatsApp. Both can be switched back on in Admin â†’ Offers & Settings.
 - **UPI payments** are verified manually: the customer submits their UTR on the order page, and you mark the order PAID after checking your bank app.
 - **Razorpay:** signatures are verified server-side. For extra reliability, also set up a Razorpay webhook (not included) before going live.
 
 ## Deployment
 
 - Works on any Node host (VPS, Railway, Render, etc.). Uploaded images go to `./uploads` (set `UPLOAD_DIR` to change this), so use a host with a persistent disk.
-- **Serverless hosts (e.g. Vercel)** have no persistent disk or SQLite. Switch to Postgres (`provider = "postgresql"` in `prisma/schema.prisma`) and to object storage for uploads.
 - The rate limiter is in-memory and only per instance. Use Redis if you run multiple instances.
 
 ## Project structure

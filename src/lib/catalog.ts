@@ -4,7 +4,7 @@ import type { Combo, ComboItem, Product } from "@prisma/client";
 import { prisma } from "./db";
 import { parseJSON } from "./format";
 
-export type ProductView = Omit<Product, "images" | "createdAt" | "updatedAt" | "priceNote"> & {
+export type ProductView = Omit<Product, "images" | "createdAt" | "updatedAt" | "priceNote" | "costPrice"> & {
   images: string[];
   image: string;
 };
@@ -12,7 +12,7 @@ export type ProductView = Omit<Product, "images" | "createdAt" | "updatedAt" | "
 export function toProductView(p: Product): ProductView {
   const images = parseJSON<string[]>(p.images, []);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { createdAt, updatedAt, priceNote, ...rest } = p;
+  const { createdAt, updatedAt, priceNote, costPrice, ...rest } = p;
   return { ...rest, images, image: images[0] ?? "/products/fuljhadi-small-placeholder.webp" };
 }
 

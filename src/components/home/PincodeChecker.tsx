@@ -3,16 +3,13 @@
 import { useState } from "react";
 import { checkPincode, type PincodeResult } from "@/lib/pincode";
 import { MapPinIcon } from "@/components/ui/Icons";
-import { waLink } from "@/lib/format";
 
 export function PincodeChecker({
   blockedPincodePrefixes,
   serviceablePrefixes,
-  whatsappNumber,
 }: {
   blockedPincodePrefixes: string;
   serviceablePrefixes: string;
-  whatsappNumber: string;
 }) {
   const [pin, setPin] = useState("");
   const [res, setRes] = useState<PincodeResult | null>(null);
@@ -52,17 +49,7 @@ export function PincodeChecker({
             <span className="text-festive-green">✓ Great! We deliver to {pin}.</span>
           ) : (
             <span className="text-saffron-400">
-              {res.reason}{" "}
-              {whatsappNumber && (
-                <a
-                  className="underline"
-                  href={waLink(whatsappNumber, `Hi, I'm in pincode ${pin}. Can I order for pickup?`)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Chat on WhatsApp
-                </a>
-              )}
+              {res.reason}
             </span>
           ))}
       </p>

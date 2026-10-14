@@ -1,14 +1,13 @@
 import Link from "next/link";
 import { getSettings } from "@/lib/settings";
 import { pageMeta } from "@/lib/seo";
-import { waLink } from "@/lib/format";
 import { InfoPage } from "@/components/site/InfoPage";
 
 export async function generateMetadata() {
   const s = await getSettings();
   return pageMeta({
     title: "Contact Us",
-    description: `Contact ${s.storeName} for Diwali crackers orders, bulk quotes and delivery questions. Call or WhatsApp us.`,
+    description: `Contact ${s.storeName} for Diwali crackers orders, bulk quotes and delivery questions. Call us.`,
     path: "/contact",
   });
 }
@@ -21,14 +20,6 @@ export default async function ContactPage() {
         {s.phone && (
           <li>
             Phone: <a href={`tel:${s.phone.replace(/\s/g, "")}`}>{s.phone}</a>
-          </li>
-        )}
-        {s.whatsappNumber && (
-          <li>
-            WhatsApp:{" "}
-            <a href={waLink(s.whatsappNumber, "Hi! I have a question about crackers.")} target="_blank" rel="noopener noreferrer">
-              Chat with us
-            </a>
           </li>
         )}
         {s.email && (
@@ -44,7 +35,7 @@ export default async function ContactPage() {
       </p>
       <h2>Pickup from shop</h2>
       <p>
-        If delivery isn&apos;t available in your area, choose &quot;Pickup from shop&quot; at checkout or message us on WhatsApp.
+        If delivery isn&apos;t available in your area, choose &quot;Pickup from shop&quot; at checkout or call us.
       </p>
     </InfoPage>
   );

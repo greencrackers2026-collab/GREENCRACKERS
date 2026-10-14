@@ -2,12 +2,11 @@
 
 import { useState } from "react";
 import { quoteSchema } from "@/lib/validation";
-import { waLink } from "@/lib/format";
-import { PlusIcon, TrashIcon, WhatsAppIcon } from "@/components/ui/Icons";
+import { PlusIcon, TrashIcon } from "@/components/ui/Icons";
 
 type Row = { product: string; qty: string };
 
-export function QuoteForm({ productOptions, whatsappNumber, storeName }: { productOptions: string[]; whatsappNumber: string; storeName: string }) {
+export function QuoteForm({ productOptions, storeName }: { productOptions: string[]; storeName: string }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -58,17 +57,7 @@ export function QuoteForm({ productOptions, whatsappNumber, storeName }: { produ
           ✅
         </p>
         <h2 className="mt-3 text-2xl font-bold text-gold-300">Quote request received!</h2>
-        <p className="mt-2 text-white/75">We&apos;ll get back to you with the best bulk price shortly. For a faster reply, send it on WhatsApp too.</p>
-        {whatsappNumber && (
-          <a
-            href={waLink(whatsappNumber, summary())}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn mt-6 bg-[#25D366] text-[#06290f]"
-          >
-            <WhatsAppIcon /> Share on WhatsApp
-          </a>
-        )}
+        <p className="mt-2 text-white/75">We&apos;ll get back to you with the best bulk price shortly.</p>
       </div>
     );
 
@@ -178,11 +167,6 @@ export function QuoteForm({ productOptions, whatsappNumber, storeName }: { produ
         <button className="btn btn-primary flex-1" disabled={busy}>
           {busy ? "Sending…" : "Request Quote"}
         </button>
-        {whatsappNumber && (
-          <a href={waLink(whatsappNumber, summary())} target="_blank" rel="noopener noreferrer" className="btn flex-1 bg-[#25D366] text-[#06290f]">
-            <WhatsAppIcon /> Send on WhatsApp
-          </a>
-        )}
       </div>
     </form>
   );

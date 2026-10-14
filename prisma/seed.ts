@@ -261,8 +261,8 @@ async function main() {
     update: {},
     create: {
       id: 1,
-      storeName: "Sivakasi Sparkle Crackers",
-      announcement: "Mega Pre-Diwali Sale is LIVE: up to 70% OFF + extra 10% with code DIWALI10",
+      storeName: "Green Crackers Limited",
+      announcement: "Mega Pre-Diwali Sale is LIVE: up to 70% OFF + FREE delivery with DIWALI10 (auto-applied)",
       highlightCoupon: "DIWALI10",
       heroTitle: "MEGA PRE-DIWALI SALE: UP TO 70% OFF",
       heroSubtitle: "Genuine Sivakasi crackers, combo packs and green crackers delivered to your doorstep.",
@@ -276,22 +276,23 @@ async function main() {
       diwaliDate: diwali,
       autoOfferThreshold: 3000,
       autoOfferPercent: 5,
-      shippingFee: 150,
+      shippingFee: 65,
+      codFee: 50,
       freeShippingAbove: 2000,
       minOrderValue: 500,
       codEnabled: true,
       upiEnabled: true,
-      upiId: process.env.UPI_ID || "yourshop@upi",
-      upiPayeeName: "Sivakasi Sparkle Crackers",
-      whatsappNumber: process.env.WHATSAPP_NUMBER || "919876543210",
-      phone: "+91 98765 43210",
-      email: "orders@example.com",
-      address: "Main Road, Sivakasi, Tamil Nadu 626123",
-      licenceNumber: "Licence No: ENTER-YOUR-PESO-LICENCE-NO",
-      restrictionEnabled: true,
+      upiId: process.env.UPI_ID || "",
+      upiPayeeName: "Green Crackers Limited",
+      whatsappNumber: process.env.WHATSAPP_NUMBER || "918920345119",
+      phone: "+91 89203 45119",
+      email: "",
+      address: "",
+      licenceNumber: "",
+      restrictionEnabled: false,
       restrictionNotice:
         "Sale and delivery of firecrackers is banned or restricted in some states/cities (for example Delhi-NCR). We do not deliver to restricted areas. Please check your pincode before ordering, and burst crackers only in permitted areas and time slots.",
-      blockedPincodePrefixes: "110,121,122,201",
+      blockedPincodePrefixes: "",
       serviceablePrefixes: "",
       seoCities: "Chennai, Bengaluru, Hyderabad, Coimbatore, Madurai, Sivakasi",
     },
@@ -342,7 +343,7 @@ async function main() {
   }
 
   const coupons = [
-    { code: "DIWALI10", type: "PERCENT", value: 10, minOrder: 1000, maxDiscount: 500 },
+    { code: "DIWALI10", type: "FREESHIP", value: 0, minOrder: 0, maxDiscount: null },
     { code: "SPARKLE200", type: "FLAT", value: 200, minOrder: 2500, maxDiscount: null },
     { code: "FIRST5", type: "PERCENT", value: 5, minOrder: 500, maxDiscount: 250 },
   ];
@@ -405,10 +406,13 @@ async function main() {
       });
       const subtotal = items.reduce((a, b) => a + b.lineTotal, 0);
       const mrpTotal = items.reduce((a, b) => a + b.unitMrp * b.qty, 0);
-      const couponDiscount = i % 3 === 0 && subtotal >= 1000 ? Math.min(Math.round(subtotal * 0.1), 500) : 0;
+      // Demo: DIWALI10 (free delivery) on most orders; COD orders pay the COD fee.
       const autoDiscount = subtotal >= s.autoOfferThreshold ? Math.round((subtotal * s.autoOfferPercent) / 100) : 0;
       const shippingFee = subtotal >= s.freeShippingAbove ? 0 : s.shippingFee;
-      const total = subtotal - couponDiscount - autoDiscount + shippingFee;
+      const useCoupon = i % 4 !== 3;
+      const couponDiscount = useCoupon ? shippingFee : 0;
+      const codFee = methods[i] === "COD" ? s.codFee : 0;
+      const total = subtotal - couponDiscount - autoDiscount + shippingFee + codFee;
       const method = methods[i];
       const status = statuses[i];
       const paid = method === "RAZORPAY" || (status === "DELIVERED");
@@ -422,10 +426,11 @@ async function main() {
           deliveryMode: "DELIVERY",
           subtotal,
           mrpTotal,
-          couponCode: couponDiscount ? "DIWALI10" : null,
+          couponCode: useCoupon ? "DIWALI10" : null,
           couponDiscount,
           autoDiscount,
           shippingFee,
+          codFee,
           total,
           paymentMethod: method,
           paymentStatus: status === "CANCELLED" ? "FAILED" : paid ? "PAID" : method === "UPI" ? "AWAITING_VERIFICATION" : "PENDING",

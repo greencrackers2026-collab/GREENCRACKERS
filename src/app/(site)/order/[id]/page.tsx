@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import QRCode from "qrcode";
 import { prisma } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
-import { formatDateTime, formatINR, waLink } from "@/lib/format";
+import { formatDateTime, formatINR } from "@/lib/format";
 import { PAYMENT_METHOD_LABEL } from "@/lib/constants";
 import { RazorpayPay } from "@/components/checkout/RazorpayPay";
 import { UpiRefForm } from "@/components/checkout/UpiRefForm";
@@ -35,10 +35,9 @@ export default async function OrderPage({
   const needsRazorpay = order.paymentMethod === "RAZORPAY" && order.paymentStatus !== "PAID" && order.status !== "CANCELLED";
   const showUpi = order.paymentMethod === "UPI" && order.paymentStatus !== "PAID" && order.status !== "CANCELLED";
   const upiUri = `upi://pay?pa=${encodeURIComponent(s.upiId)}&pn=${encodeURIComponent(s.upiPayeeName || s.storeName)}&am=${order.total}&cu=INR&tn=${encodeURIComponent(order.orderNumber)}`;
-  const qr = showUpi && s.upiId ? await QRCode.toDataURL(upiUri, { margin: 1, width: 240 }) : null;
+  const qr = showUpi && s.upiId && !s.upiQrImage ? await QRCode.toDataURL(upiUri, { margin: 1, width: 240 }) : null;
   const savings = order.mrpTotal - order.subtotal + order.couponDiscount + order.autoDiscount;
 
-  const waText = `Hi ${s.storeName}! I placed order ${order.orderNumber} for ${formatINR(order.total)} (${PAYMENT_METHOD_LABEL[order.paymentMethod]}). Name: ${order.name}, Phone: ${order.phone}.`;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -47,7 +46,11 @@ export default async function OrderPage({
           {needsRazorpay ? "🧾" : "🎉"}
         </p>
         <h1 className="mt-3 font-display text-3xl text-gradient sm:text-4xl">
-          {needsRazorpay ? "Complete your payment" : "Thank you! Order placed"}
+          {needsRazorpay
+            ? "Complete your payment"
+            : order.paymentMethod === "UPI" && order.paymentStatus !== "PAID" && order.status !== "CANCELLED"
+              ? "Order received!"
+              : "Thank you! Order placed"}
         </h1>
         <p className="mt-2 text-white/75">
           Order ID: <b className="font-mono text-gold-300">{order.orderNumber}</b>
@@ -59,7 +62,7 @@ export default async function OrderPage({
             {PAY_STATUS[order.paymentStatus] ?? order.paymentStatus}
           </span>
         </div>
-        <p className="mt-3 text-sm text-white/60">Please save your order ID. We will call or WhatsApp you on {order.phone} to confirm.</p>
+        <p className="mt-3 text-sm text-white/60">Please save your order ID. We will call you on {order.phone} to confirm.</p>
       </div>
 
       {needsRazorpay && (
@@ -71,33 +74,46 @@ export default async function OrderPage({
         </section>
       )}
 
-      {showUpi && (
-        <section className="glass mt-6 grid gap-6 rounded-3xl p-6 sm:grid-cols-[auto_1fr]" aria-label="Pay by UPI">
-          {qr && (
-            <div className="mx-auto rounded-2xl bg-white p-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={qr} alt={`UPI QR code to pay ${formatINR(order.total)}`} width={200} height={200} />
-            </div>
-          )}
-          <div className="space-y-3">
-            <h2 className="text-lg font-bold text-gold-300">Pay {formatINR(order.total)} via UPI</h2>
-            <p className="text-sm text-white/75">
-              Scan the QR with GPay, PhonePe, Paytm or any UPI app, or pay to UPI ID{" "}
-              <b className="font-mono text-white">{s.upiId}</b>. Add <b>{order.orderNumber}</b> in the note.
+      {showUpi &&
+        (order.paymentProof && order.paymentStatus === "AWAITING_VERIFICATION" ? (
+          <section className="glass mt-6 rounded-3xl p-6 text-center" aria-label="Payment verification">
+            <p className="text-3xl" aria-hidden="true">
+              🔍
             </p>
-            <a href={upiUri} className="btn btn-ghost sm:hidden">
-              Open UPI app
-            </a>
-            {order.paymentStatus === "AWAITING_VERIFICATION" && order.upiRef ? (
-              <p className="text-sm text-festive-green">
-                ✓ Transaction ID <b>{order.upiRef}</b> received. We&apos;re verifying it.
-              </p>
-            ) : (
-              <UpiRefForm orderId={order.id} />
+            <h2 className="mt-2 text-lg font-bold text-gold-300">Payment screenshot received</h2>
+            <p className="mt-1 text-sm text-white/75">
+              We&apos;re verifying your UPI payment of <b>{formatINR(order.total)}</b>. Your order will be confirmed once it&apos;s
+              verified, usually within a few hours. We&apos;ll update you shortly.
+            </p>
+          </section>
+        ) : (
+          <section className="glass mt-6 grid gap-6 rounded-3xl p-6 sm:grid-cols-[auto_1fr]" aria-label="Pay by UPI">
+            {(s.upiQrImage || qr) && (
+              <div className="mx-auto w-48 rounded-2xl bg-white p-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={s.upiQrImage || qr!} alt={`UPI QR code to pay ${formatINR(order.total)}`} className="h-auto w-full" />
+              </div>
             )}
-          </div>
-        </section>
-      )}
+            <div className="space-y-3">
+              <h2 className="text-lg font-bold text-gold-300">Pay {formatINR(order.total)} via UPI</h2>
+              <p className="text-sm text-white/75">
+                Scan the QR with GPay, PhonePe, Paytm or any UPI app
+                {s.upiId && (
+                  <>
+                    {" "}or pay to UPI ID <b className="font-mono text-white">{s.upiId}</b>
+                  </>
+                )}
+                , then upload the payment screenshot below.
+              </p>
+              {s.upiId && (
+                <a href={upiUri} className="btn btn-ghost sm:hidden">
+                  Open UPI app
+                </a>
+              )}
+              <UpiRefForm orderId={order.id} />
+            </div>
+          </section>
+        ))}
 
       <section className="glass mt-6 rounded-3xl p-6" aria-labelledby="items-title">
         <h2 id="items-title" className="text-lg font-bold text-gold-300">
@@ -138,6 +154,12 @@ export default async function OrderPage({
             <dt>Delivery</dt>
             <dd>{order.shippingFee ? formatINR(order.shippingFee) : "FREE"}</dd>
           </div>
+          {order.codFee > 0 && (
+            <div className="flex justify-between">
+              <dt>COD charges</dt>
+              <dd>{formatINR(order.codFee)}</dd>
+            </div>
+          )}
           <div className="flex justify-between border-t border-white/10 pt-2 text-lg font-bold">
             <dt>Total</dt>
             <dd>{formatINR(order.total)}</dd>
@@ -165,11 +187,6 @@ export default async function OrderPage({
       </section>
 
       <div className="mt-8 flex flex-wrap justify-center gap-3">
-        {s.whatsappNumber && (
-          <a href={waLink(s.whatsappNumber, waText)} target="_blank" rel="noopener noreferrer" className="btn bg-[#25D366] text-[#06290f]">
-            Share order on WhatsApp
-          </a>
-        )}
         <Link href="/products" className="btn btn-ghost">
           Continue Shopping
         </Link>

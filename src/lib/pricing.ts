@@ -27,6 +27,7 @@ export type PriceQuote = {
   couponMessage: string | null;
   autoDiscount: number;
   shippingFee: number;
+  codFee: number;
   total: number;
   savings: number;
   meetsMinimum: boolean;
@@ -39,7 +40,7 @@ export type PriceQuote = {
 export async function priceCart(
   input: CartLineInput[],
   settings: SiteSettings,
-  opts: { couponCode?: string | null; deliveryMode?: "DELIVERY" | "PICKUP" } = {},
+  opts: { couponCode?: string | null; deliveryMode?: "DELIVERY" | "PICKUP"; paymentMethod?: "RAZORPAY" | "UPI" | "COD" } = {},
 ): Promise<PriceQuote> {
   const errors: string[] = [];
   const productIds = input.filter((l) => l.kind === "PRODUCT").map((l) => l.id);
@@ -108,7 +109,10 @@ export async function priceCart(
   const subtotal = lines.reduce((a, l) => a + l.lineTotal, 0);
   const mrpTotal = lines.reduce((a, l) => a + l.unitMrp * l.qty, 0);
 
-  // Coupon
+  const shippingFee =
+    opts.deliveryMode === "PICKUP" || subtotal === 0 || subtotal >= settings.freeShippingAbove ? 0 : settings.shippingFee;
+
+  // Coupon (FREESHIP coupons waive the delivery fee; it shows as a coupon discount)
   let couponDiscount = 0;
   let couponMessage: string | null = null;
   let couponCode: string | null = null;
@@ -119,11 +123,17 @@ export async function priceCart(
     else if (c.expiresAt && c.expiresAt < new Date()) couponMessage = "This coupon has expired.";
     else if (subtotal < c.minOrder) couponMessage = `Add items worth ₹${c.minOrder - subtotal} more to use ${code}.`;
     else {
-      couponDiscount =
-        c.type === "PERCENT" ? Math.round((subtotal * c.value) / 100) : Math.min(c.value, subtotal);
-      if (c.maxDiscount) couponDiscount = Math.min(couponDiscount, c.maxDiscount);
+      if (c.type === "FREESHIP") couponDiscount = shippingFee;
+      else if (c.type === "PERCENT") couponDiscount = Math.round((subtotal * c.value) / 100);
+      else couponDiscount = Math.min(c.value, subtotal);
+      if (c.maxDiscount && c.type !== "FREESHIP") couponDiscount = Math.min(couponDiscount, c.maxDiscount);
       couponCode = c.code;
-      couponMessage = `${c.code} applied: you save ₹${couponDiscount}.`;
+      couponMessage =
+        c.type === "FREESHIP"
+          ? couponDiscount > 0
+            ? `${c.code} applied: FREE delivery (you save ₹${couponDiscount}).`
+            : `${c.code} applied: delivery is already free on this order.`
+          : `${c.code} applied: you save ₹${couponDiscount}.`;
     }
   }
 
@@ -133,10 +143,9 @@ export async function priceCart(
       ? Math.round((subtotal * settings.autoOfferPercent) / 100)
       : 0;
 
-  const shippingFee =
-    opts.deliveryMode === "PICKUP" || subtotal === 0 || subtotal >= settings.freeShippingAbove ? 0 : settings.shippingFee;
+  const codFee = opts.paymentMethod === "COD" && subtotal > 0 ? settings.codFee : 0;
 
-  const total = Math.max(0, subtotal - couponDiscount - autoDiscount + shippingFee);
+  const total = Math.max(0, subtotal - couponDiscount - autoDiscount + shippingFee + codFee);
 
   return {
     lines,
@@ -148,6 +157,7 @@ export async function priceCart(
     couponMessage,
     autoDiscount,
     shippingFee,
+    codFee,
     total,
     savings: mrpTotal - subtotal + couponDiscount + autoDiscount,
     meetsMinimum: subtotal >= settings.minOrderValue,

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { formatDateTime, formatINR } from "@/lib/format";
 import { PageTitle, StatCard, StatusBadge } from "@/components/admin/ui";
+import { getCostMaps, itemUnitCost, sumProfit } from "@/lib/profit";
 
 export const metadata = { title: "Dashboard" };
 
@@ -18,6 +19,31 @@ export default async function Dashboard() {
   const today = istDayStart(now);
   const weekStart = istDayStart(now, 6);
   const notCancelled = { status: { not: "CANCELLED" } };
+
+  const [maps, plOrders] = await Promise.all([
+    getCostMaps(),
+    prisma.order.findMany({ where: { status: { not: "CANCELLED" } }, include: { items: true } }),
+  ]);
+  const plAll = sumProfit(plOrders, maps);
+  const plToday = sumProfit(plOrders.filter((o) => o.createdAt >= today), maps);
+  const plWeek = sumProfit(plOrders.filter((o) => o.createdAt >= weekStart), maps);
+  const byItem = new Map<string, { name: string; qty: number; revenue: number; cost: number; missing: boolean }>();
+  for (const o of plOrders) {
+    // Spread order-level discounts across lines in proportion to their value.
+    const factor = o.subtotal ? (o.subtotal - o.couponDiscount - o.autoDiscount) / o.subtotal : 1;
+    for (const i of o.items) {
+      const key = `${i.kind}:${i.refId}`;
+      const row = byItem.get(key) ?? { name: i.name, qty: 0, revenue: 0, cost: 0, missing: false };
+      const u = itemUnitCost(i, maps);
+      row.qty += i.qty;
+      row.revenue += i.lineTotal * factor;
+      row.cost += u * i.qty;
+      row.missing ||= !u;
+      byItem.set(key, row);
+    }
+  }
+  const itemRows = [...byItem.values()].sort((a, b) => b.revenue - b.cost - (a.revenue - a.cost));
+  const pc = (n: number) => (n >= 0 ? "text-festive-green" : "text-red-300");
 
   const [todayAgg, allAgg, pending, awaitingPay, newQuotes, lowStock, recent, week, customers] = await Promise.all([
     prisma.order.aggregate({ where: { createdAt: { gte: today }, ...notCancelled }, _sum: { total: true }, _count: true }),
@@ -61,6 +87,64 @@ export default async function Dashboard() {
         <StatCard label="New quote requests" value={newQuotes} />
         <StatCard label="Customers" value={customers} />
       </div>
+
+      <section className="glass mt-6 rounded-2xl p-5" aria-labelledby="pl-title">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="pl-title" className="font-semibold">Profit &amp; loss</h2>
+          <p className="text-xs text-white/50">Revenue after discounts, excluding delivery fees and cancelled orders</p>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="rounded-xl bg-white/5 p-4">
+            <p className="text-sm text-white/60">Today&apos;s profit</p>
+            <p className={`text-2xl font-bold ${pc(plToday.profit)}`}>{formatINR(plToday.profit)}</p>
+          </div>
+          <div className="rounded-xl bg-white/5 p-4">
+            <p className="text-sm text-white/60">Last 7 days profit</p>
+            <p className={`text-2xl font-bold ${pc(plWeek.profit)}`}>{formatINR(plWeek.profit)}</p>
+          </div>
+          <div className="rounded-xl bg-white/5 p-4">
+            <p className="text-sm text-white/60">Total profit</p>
+            <p className={`text-2xl font-bold ${pc(plAll.profit)}`}>{formatINR(plAll.profit)}</p>
+            <p className="text-xs text-white/50">{plAll.revenue ? ((plAll.profit / plAll.revenue) * 100).toFixed(1) : "0"}% margin</p>
+          </div>
+          <div className="rounded-xl bg-white/5 p-4 text-sm">
+            <p className="flex justify-between"><span className="text-white/60">Revenue</span><b>{formatINR(plAll.revenue)}</b></p>
+            <p className="flex justify-between"><span className="text-white/60">Your cost</span><b>{formatINR(plAll.cost)}</b></p>
+            <p className="flex justify-between"><span className="text-white/60">Discounts given</span><b>{formatINR(plAll.discounts)}</b></p>
+          </div>
+        </div>
+        {plAll.missingCount > 0 && (
+          <p className="mt-3 rounded-xl bg-saffron-500/15 p-3 text-sm text-saffron-300">
+            ⚠️ {plAll.missingCount} order(s) contain products without a cost price, so profit is overstated.{" "}
+            <Link href="/admin/products" className="underline">Set cost prices in Products</Link>.
+          </p>
+        )}
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <caption className="sr-only">Profit by product</caption>
+            <thead className="text-white/55">
+              <tr>
+                <th className="py-2 font-medium">Product / combo</th>
+                <th className="py-2 text-right font-medium">Units sold</th>
+                <th className="py-2 text-right font-medium">Revenue</th>
+                <th className="py-2 text-right font-medium">Cost</th>
+                <th className="py-2 text-right font-medium">Profit</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/10">
+              {itemRows.map((r) => (
+                <tr key={r.name}>
+                  <td className="py-2">{r.name}</td>
+                  <td className="py-2 text-right">{r.qty}</td>
+                  <td className="py-2 text-right">{formatINR(Math.round(r.revenue))}</td>
+                  <td className="py-2 text-right">{r.missing ? <span className="text-saffron-400">not set</span> : formatINR(r.cost)}</td>
+                  <td className={`py-2 text-right font-semibold ${pc(r.revenue - r.cost)}`}>{formatINR(Math.round(r.revenue - r.cost))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_1fr]">
         <section className="glass rounded-2xl p-5" aria-labelledby="rev-title">

@@ -9,17 +9,17 @@ export function getFaqs(s: SiteSettings) {
     },
     {
       q: `How does the ${s.maxDiscountPercent}% OFF pre-Diwali offer work?`,
-      a: `All listed prices are already discounted (MRP shown struck through). On top of that you can apply coupon codes${
-        s.highlightCoupon ? ` like ${s.highlightCoupon}` : ""
-      }, and orders above ${formatINR(s.autoOfferThreshold)} get an automatic extra ${s.autoOfferPercent}% off.`,
+      a: `All listed prices are already discounted (MRP shown struck through).${
+        s.autoCoupon?.type === "FREESHIP" ? ` Code ${s.autoCoupon.code} is applied automatically at checkout for FREE delivery.` : ""
+      } Orders above ${formatINR(s.autoOfferThreshold)} also get an automatic extra ${s.autoOfferPercent}% off.`,
     },
     {
       q: "Do you deliver to my city?",
-      a: "We deliver to most pincodes in India where the sale of crackers is permitted. Enter your pincode on any product page or at checkout to check. We do not deliver to areas with a ban (for example Delhi-NCR). You can still order on WhatsApp for pickup from our licensed shop.",
+      a: "Yes, we take orders from all over India. After you order, we will call you to confirm delivery details for your area. Pickup from our shop is also available.",
     },
     {
       q: "What payment options are available?",
-      a: "You can pay online with Razorpay (UPI, cards, netbanking, wallets), pay directly by UPI (scan QR or use our UPI ID), or choose Cash on Delivery where available.",
+      a: `Pay by UPI: scan our QR at checkout, pay, and upload the payment screenshot. We confirm your order after verifying it. Or choose Cash on Delivery (₹${s.codFee} extra COD charges).`,
     },
     {
       q: "Do you sell green crackers?",
@@ -27,13 +27,15 @@ export function getFaqs(s: SiteSettings) {
     },
     {
       q: "Can I get a wholesale or bulk price?",
-      a: "Absolutely. Use our Get a Quote form with the products and quantities you need, and we will reply on WhatsApp or by phone with the best bulk price.",
+      a: "Absolutely. Use our Get a Quote form with the products and quantities you need, and we will reply by phone with the best bulk price.",
     },
     {
       q: `Is there a delivery charge?`,
-      a: `Delivery is FREE on orders above ${formatINR(s.freeShippingAbove)}. Below that a flat ${formatINR(
-        s.shippingFee,
-      )} delivery charge applies. Minimum order value is ${formatINR(s.minOrderValue)}.`,
+      a: `Delivery charge is ${formatINR(s.shippingFee)}${
+        s.autoCoupon?.type === "FREESHIP" ? `, waived with code ${s.autoCoupon.code} (applied automatically)` : ""
+      }. Delivery is also free on orders above ${formatINR(s.freeShippingAbove)}. Cash on Delivery orders have ${formatINR(
+        s.codFee,
+      )} extra COD charges. Minimum order value is ${formatINR(s.minOrderValue)}.`,
     },
   ];
 }

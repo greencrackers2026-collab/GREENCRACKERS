@@ -20,6 +20,7 @@ model Product {
   unit         String // box | pack | piece
   price        Int // sale price in INR (after discount)
   mrp          Int // MRP in INR (shown struck-through)
+  costPrice    Int         @default(0) // owner's purchase cost per unit (admin only, never sent to customers)
   priceNote    String? // internal note for owner, e.g. "Listed range 450–500"
   stock        Int         @default(100)
   images       String      @default("[]") // JSON array of image URLs
@@ -66,7 +67,7 @@ model ComboItem {
 model Coupon {
   id          String    @id @default(cuid())
   code        String    @unique
-  type        String // PERCENT | FLAT
+  type        String // PERCENT | FLAT | FREESHIP (waives the delivery fee)
   value       Int
   minOrder    Int       @default(0)
   maxDiscount Int? // cap for PERCENT coupons
@@ -108,10 +109,12 @@ model Order {
   couponDiscount    Int         @default(0)
   autoDiscount      Int         @default(0)
   shippingFee       Int         @default(0)
+  codFee            Int         @default(0)
   total             Int
   paymentMethod     String // RAZORPAY | UPI | COD
   paymentStatus     String      @default("PENDING") // PENDING | AWAITING_VERIFICATION | PAID | FAILED | REFUNDED
   upiRef            String?
+  paymentProof      String? // customer's UPI payment screenshot file (admin-only)
   razorpayOrderId   String?
   razorpayPaymentId String?
   status            String      @default("NEW") // NEW | CONFIRMED | PACKED | SHIPPED | DELIVERED | CANCELLED
@@ -135,6 +138,7 @@ model OrderItem {
   unit      String
   unitPrice Int
   unitMrp   Int
+  unitCost  Int     @default(0) // cost snapshot at order time (0 = not set; falls back to current cost)
   qty       Int
   lineTotal Int
 }
@@ -165,13 +169,15 @@ model Settings {
   diwaliDate           DateTime
   autoOfferThreshold   Int      @default(3000) // extra off on orders above this
   autoOfferPercent     Int      @default(5)
-  shippingFee          Int      @default(150)
+  shippingFee          Int      @default(65)
+  codFee               Int      @default(50) // extra charge per Cash on Delivery order
   freeShippingAbove    Int      @default(2000)
   minOrderValue        Int      @default(500)
   codEnabled           Boolean  @default(true)
   upiEnabled           Boolean  @default(true)
   upiId                String   @default("")
   upiPayeeName         String   @default("")
+  upiQrImage           String   @default("") // uploaded UPI QR image URL
   whatsappNumber       String   @default("")
   phone                String   @default("")
   email                String   @default("")

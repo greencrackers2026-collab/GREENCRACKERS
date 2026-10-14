@@ -27,12 +27,13 @@ export default async function AdminProducts({ searchParams }: { searchParams: Pr
         </p>
       )}
       <div className="glass overflow-x-auto rounded-2xl">
-        <table className="w-full min-w-[820px] text-left text-sm">
+        <table className="w-full min-w-[940px] text-left text-sm">
           <thead className="bg-white/5 text-white/60">
             <tr>
               <th className="p-3 font-medium">Product</th>
               <th className="p-3 font-medium">Category</th>
               <th className="p-3 font-medium">Price / MRP</th>
+              <th className="p-3 font-medium">Cost / Profit per unit</th>
               <th className="p-3 font-medium">Stock</th>
               <th className="p-3 font-medium">Visible</th>
               <th className="p-3 font-medium" />
@@ -61,6 +62,21 @@ export default async function AdminProducts({ searchParams }: { searchParams: Pr
                   <td className="p-3">
                     <b>{formatINR(p.price)}</b> <span className="text-white/50 line-through">{formatINR(p.mrp)}</span>
                     <span className="block text-xs text-festive-green">{discountPercent(p.mrp, p.price)}% off</span>
+                  </td>
+                  <td className="p-3">
+                    {r.costPrice > 0 ? (
+                      <>
+                        {formatINR(r.costPrice)}
+                        <span className={`block text-xs font-semibold ${p.price - r.costPrice >= 0 ? "text-festive-green" : "text-red-300"}`}>
+                          {p.price - r.costPrice >= 0 ? "+" : "−"}
+                          {formatINR(Math.abs(p.price - r.costPrice))} ({(((p.price - r.costPrice) / p.price) * 100).toFixed(0)}%)
+                        </span>
+                      </>
+                    ) : (
+                      <Link href={`/admin/products/${p.id}`} className="text-xs text-saffron-400 underline">
+                        Set cost
+                      </Link>
+                    )}
                   </td>
                   <td className={`p-3 ${p.stock < 25 ? "text-saffron-400" : ""}`}>{p.stock}</td>
                   <td className="p-3">

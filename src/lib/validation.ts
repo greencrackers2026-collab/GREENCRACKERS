@@ -41,6 +41,10 @@ export const checkoutSchema = z.object({
   deliveryMode: z.enum(["DELIVERY", "PICKUP"]).default("DELIVERY"),
   paymentMethod: z.enum(["RAZORPAY", "UPI", "COD"]),
   upiRef: z.string().trim().max(40).optional(),
+  paymentProof: z
+    .string()
+    .regex(/^[a-f0-9]{32}\.webp$/)
+    .optional(),
 });
 
 export const quoteSchema = z.object({

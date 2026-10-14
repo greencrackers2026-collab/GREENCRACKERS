@@ -4,10 +4,10 @@ import { BASE_KEYWORDS, SITE_URL, absoluteUrl, cityKeywords } from "@/lib/seo";
 import { HeaderClient } from "@/components/site/HeaderClient";
 import { RestrictionBanner } from "@/components/site/RestrictionBanner";
 import { Footer } from "@/components/site/Footer";
-import { WhatsAppFloat } from "@/components/site/WhatsAppFloat";
 import { JsonLd } from "@/components/site/JsonLd";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { MotionProvider } from "@/components/MotionProvider";
+import { VideoBackdrop } from "@/components/media/VideoBackdrop";
 
 export const revalidate = 300;
 
@@ -58,6 +58,10 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       >
         Skip to content
       </a>
+      {/* Ambient fireworks behind the glass UI (desktop only; black areas vanish via screen blending) */}
+      <div className="pointer-events-none fixed inset-0 -z-10 hidden opacity-45 mix-blend-screen lg:block" aria-hidden="true">
+        <VideoBackdrop clips={["sky-fireworks"]} desktopOnly showPoster={false} />
+      </div>
       <div className="sticky top-0 z-50">
         {s.announcement && (
           <div className="bg-gradient-to-r from-saffron-600 via-gold-500 to-saffron-600 text-black">
@@ -76,8 +80,11 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       {s.restrictionEnabled && s.restrictionNotice && <RestrictionBanner text={s.restrictionNotice} />}
       <main id="main">{children}</main>
       <Footer s={s} />
-      <CartDrawer freeShippingAbove={s.freeShippingAbove} minOrderValue={s.minOrderValue} />
-      <WhatsAppFloat number={s.whatsappNumber} storeName={s.storeName} />
+      <CartDrawer
+        freeShippingAbove={s.freeShippingAbove}
+        minOrderValue={s.minOrderValue}
+        freeDeliveryCode={s.autoCoupon?.type === "FREESHIP" ? s.autoCoupon.code : null}
+      />
       <JsonLd data={[org, website]} />
     </MotionProvider>
   );

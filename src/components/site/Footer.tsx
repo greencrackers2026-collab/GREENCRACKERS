@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { SiteSettings } from "@/lib/settings";
 import { CATEGORIES } from "@/lib/constants";
-import { waLink } from "@/lib/format";
 
 export function Footer({ s }: { s: SiteSettings }) {
   const year = new Date().getFullYear();
@@ -68,13 +67,6 @@ export function Footer({ s }: { s: SiteSettings }) {
                 <a href={`mailto:${s.email}`} className="hover:text-white">{s.email}</a>
               </p>
             )}
-            {s.whatsappNumber && (
-              <p>
-                <a href={waLink(s.whatsappNumber, "Hi! I have a question.")} target="_blank" rel="noopener noreferrer" className="hover:text-white">
-                  WhatsApp us
-                </a>
-              </p>
-            )}
           </address>
         </div>
       </div>
@@ -82,8 +74,7 @@ export function Footer({ s }: { s: SiteSettings }) {
         <div className="mx-auto max-w-7xl space-y-2 px-4 py-6 text-xs leading-relaxed text-white/55">
           <p>
             🌿 We promote green crackers (CSIR-NEERI marked) wherever available. Please burst crackers only in permitted
-            areas and during time slots allowed by the Hon&apos;ble Supreme Court and your local authorities. Sale and
-            delivery are not available in areas where crackers are banned.
+            areas and during time slots allowed by the Hon&apos;ble Supreme Court and your local authorities.
           </p>
           <p>
             © {year} {s.storeName}. All prices in INR, inclusive of applicable taxes. Product images are for

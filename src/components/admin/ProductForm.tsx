@@ -24,6 +24,7 @@ export function ProductForm({ product }: { product: P | null }) {
   const [slugTouched, setSlugTouched] = useState(Boolean(product));
   const [price, setPrice] = useState(String(product?.price ?? ""));
   const [mrp, setMrp] = useState(String(product?.mrp ?? ""));
+  const [cost, setCost] = useState(String(product?.costPrice || ""));
   const [uploading, setUploading] = useState(false);
   const [uploadErr, setUploadErr] = useState<string | null>(null);
 
@@ -47,6 +48,8 @@ export function ProductForm({ product }: { product: P | null }) {
   }
 
   const off = discountPercent(Number(mrp) || 0, Number(price) || 0);
+  const unitProfit = (Number(price) || 0) - (Number(cost) || 0);
+  const unitMargin = Number(price) ? (unitProfit / Number(price)) * 100 : 0;
 
   return (
     <form action={action} className="grid gap-6 xl:grid-cols-[1.3fr_1fr]">
@@ -108,6 +111,17 @@ export function ProductForm({ product }: { product: P | null }) {
           <label>
             <span className="label">MRP (₹) *{off > 0 && <span className="ml-2 text-festive-green">{off}% OFF</span>}</span>
             <input name="mrp" type="number" min={1} className="input" required value={mrp} onChange={(e) => setMrp(e.target.value)} />
+          </label>
+          <label className="sm:col-span-2">
+            <span className="label">Your cost price (₹ per {product?.unit ?? "unit"}): admin only, never shown to customers</span>
+            <input name="costPrice" type="number" min={0} className="input" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="What you pay the supplier" />
+            {Number(cost) > 0 && Number(price) > 0 ? (
+              <span className={`mt-1 block text-sm font-semibold ${unitProfit >= 0 ? "text-festive-green" : "text-red-300"}`}>
+                {unitProfit >= 0 ? "Profit" : "Loss"} ₹{Math.abs(unitProfit)} per unit ({unitMargin.toFixed(1)}% margin) at the sale price
+              </span>
+            ) : (
+              <span className="mt-1 block text-xs text-saffron-400">Add a cost price to see profit / loss on orders.</span>
+            )}
           </label>
           <label>
             <span className="label">Stock</span>

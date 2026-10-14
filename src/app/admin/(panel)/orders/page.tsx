@@ -6,6 +6,7 @@ import { formatDateTime, formatINR } from "@/lib/format";
 import { PageTitle, StatusBadge } from "@/components/admin/ui";
 import { AutoSubmitSelect } from "@/components/admin/FormBits";
 import { updateOrder } from "../../actions";
+import { getCostMaps, orderProfit } from "@/lib/profit";
 
 export const metadata = { title: "Orders" };
 const PER_PAGE = 25;
@@ -24,6 +25,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     }),
     prisma.order.count({ where }),
   ]);
+  const maps = await getCostMaps();
   const filterQs = new URLSearchParams(
     Object.entries({ q: sp.q, status: sp.status, payment: sp.payment, from: sp.from, to: sp.to }).filter(([, v]) => v) as [string, string][],
   ).toString();
@@ -125,10 +127,25 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                 <td className="p-3">
                   <span className="font-semibold">{formatINR(o.total)}</span>
                   {o.couponCode && <span className="block text-xs text-festive-green">{o.couponCode}</span>}
+                  {(() => {
+                    const pl = orderProfit(o, maps);
+                    return (
+                      <span className={`block text-xs ${pl.profit >= 0 ? "text-festive-green" : "text-red-300"}`} title="Profit after your cost">
+                        {pl.profit >= 0 ? "Profit " : "Loss "}
+                        {formatINR(Math.abs(pl.profit))}
+                        {pl.missing && "*"}
+                      </span>
+                    );
+                  })()}
                 </td>
                 <td className="p-3">
                   <span className="block text-xs text-white/60">{o.paymentMethod}</span>
                   <StatusBadge value={o.paymentStatus} />
+                  {o.paymentMethod === "UPI" && o.paymentProof && o.paymentStatus === "AWAITING_VERIFICATION" && (
+                    <Link href={`/admin/orders/${o.id}`} className="mt-1 block text-xs font-semibold text-gold-300 underline">
+                      Review screenshot →
+                    </Link>
+                  )}
                 </td>
                 <td className="p-3">
                   {o.status === "CANCELLED" ? (

@@ -7,7 +7,7 @@ import { CATEGORIES } from "@/lib/constants";
 import { formatINR } from "@/lib/format";
 import { getFaqs } from "@/lib/faq";
 import { BASE_KEYWORDS, cityKeywords, pageMeta } from "@/lib/seo";
-import { Fireworks } from "@/components/home/Fireworks";
+import { VideoBackdrop } from "@/components/media/VideoBackdrop";
 import { Countdown } from "@/components/home/Countdown";
 import { RotatingTaglines } from "@/components/home/RotatingTaglines";
 import { PincodeChecker } from "@/components/home/PincodeChecker";
@@ -29,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
 const TESTIMONIALS = [
   { name: "Priya R.", city: "Chennai", text: "Ordered the Family Pack. Delivered in 3 days, everything well packed. Kids loved the chakkars!" },
   { name: "Arjun M.", city: "Bengaluru", text: "Genuine Sivakasi stuff at half the shop price. The 30-shot sky peti was the highlight of our society celebration." },
-  { name: "Lakshmi N.", city: "Madurai", text: "Easy WhatsApp ordering and COD. The Mega Crackling Coconut is a must-buy." },
+  { name: "Lakshmi N.", city: "Madurai", text: "Easy ordering and COD. The Mega Crackling Coconut is a must-buy." },
 ];
 
 export default async function HomePage() {
@@ -43,8 +43,11 @@ export default async function HomePage() {
     <>
       {/* HERO */}
       <section className="relative overflow-hidden" aria-labelledby="hero-title">
-        <Fireworks />
-        <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 pb-16 pt-10 sm:pt-16 lg:grid-cols-[1.15fr_1fr]">
+        <VideoBackdrop clips={["sparkler", "sky-fireworks", "chakkar"]} />
+        {/* Readability overlays: darker on the text side, fading into the page at the bottom */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-ink-950/90 via-ink-950/60 to-ink-950/25" aria-hidden="true" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-ink-950" aria-hidden="true" />
+        <div className="relative mx-auto grid min-h-[78vh] max-w-7xl items-center gap-10 px-4 pb-20 pt-10 sm:pt-16 lg:grid-cols-[1.15fr_1fr]">
           <div className="space-y-6 text-center lg:text-left">
             <span className="badge glass px-3 py-1.5 text-gold-300">🪔 Direct from Sivakasi · Licensed Seller</span>
             <h1 id="hero-title" className="font-display text-4xl leading-tight sm:text-5xl lg:text-6xl">
@@ -86,9 +89,14 @@ export default async function HomePage() {
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
             { icon: <TagIcon />, t: `Up to ${s.maxDiscountPercent}% OFF`, d: "On all crackers, already applied" },
-            ...(s.highlightCoupon ? [{ icon: <SparkIcon />, t: `Code ${s.highlightCoupon}`, d: "Extra savings at checkout" }] : []),
+            ...(s.autoCoupon?.type === "FREESHIP"
+              ? [{ icon: <TruckIcon />, t: "FREE Delivery", d: `Code ${s.autoCoupon.code} auto-applied at checkout` }]
+              : [
+                  ...(s.highlightCoupon ? [{ icon: <SparkIcon />, t: `Code ${s.highlightCoupon}`, d: "Extra savings at checkout" }] : []),
+                  { icon: <TruckIcon />, t: "Free Delivery", d: `On orders above ${formatINR(s.freeShippingAbove)}` },
+                ]),
             { icon: <SparkIcon />, t: `Extra ${s.autoOfferPercent}% OFF`, d: `On orders above ${formatINR(s.autoOfferThreshold)}` },
-            { icon: <TruckIcon />, t: "Free Delivery", d: `On orders above ${formatINR(s.freeShippingAbove)}` },
+            { icon: <ShieldIcon />, t: "Easy Payment", d: `UPI or Cash on Delivery` },
           ].map((o) => (
             <li key={o.t} className="glass flex items-center gap-3 rounded-2xl p-4">
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-gold-400/30 to-saffron-500/30 text-gold-300">
@@ -126,8 +134,31 @@ export default async function HomePage() {
         </ul>
       </section>
 
+      {/* ALL CRACKERS (mobile): the full catalogue on the front page */}
+      <section className="mx-auto mt-10 max-w-7xl px-4 md:hidden" aria-labelledby="all-title">
+        <h2 id="all-title" className="text-2xl font-bold">
+          All <span className="text-gradient">Crackers</span>
+        </h2>
+        {CATEGORIES.map((c) => {
+          const items = products.filter((p) => p.category === c.key);
+          if (items.length === 0) return null;
+          return (
+            <div key={c.key} className="mt-6">
+              <h3 className="text-lg font-semibold text-gold-300">
+                <span aria-hidden="true">{c.emoji}</span> {c.label}
+              </h3>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                {items.map((p) => (
+                  <ProductCard key={p.id} p={p} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </section>
+
       {/* FEATURED */}
-      <section className="mx-auto mt-16 max-w-7xl px-4" aria-labelledby="featured-title">
+      <section className="mx-auto mt-16 hidden md:block max-w-7xl px-4" aria-labelledby="featured-title">
         <div className="flex items-end justify-between gap-4">
           <h2 id="featured-title" className="text-2xl font-bold sm:text-3xl">
             Pre-Diwali <span className="text-gradient">Hot Deals</span>
@@ -200,12 +231,38 @@ export default async function HomePage() {
             <PincodeChecker
               blockedPincodePrefixes={s.blockedPincodePrefixes}
               serviceablePrefixes={s.serviceablePrefixes}
-              whatsappNumber={s.whatsappNumber}
             />
             <p className="mt-3 text-xs text-white/55">
-              Can&apos;t get delivery? <Link href="/quote" className="underline">Request a quote</Link> or order on WhatsApp for pickup
+              Can&apos;t get delivery? <Link href="/quote" className="underline">Request a quote</Link> for pickup
               from our licensed shop.
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* DIYA VIDEO BAND */}
+      <section className="relative mt-20 overflow-hidden" aria-labelledby="band-title">
+        {/* Soft-edged band: the video fades in/out at top and bottom instead of a hard cut */}
+        <div className="absolute inset-0 [mask-image:linear-gradient(to_bottom,transparent,black_22%,black_78%,transparent)]">
+          <VideoBackdrop clips={["diyas"]} />
+          <div className="pointer-events-none absolute inset-0 bg-ink-950/55" aria-hidden="true" />
+        </div>
+        <div className="relative mx-auto flex min-h-[60vh] max-w-3xl flex-col items-center justify-center gap-5 px-4 py-20 text-center">
+          <p className="badge glass px-3 py-1.5 text-gold-300">🪔 Shubh Deepavali</p>
+          <h2 id="band-title" className="font-display text-3xl leading-tight drop-shadow-lg sm:text-5xl">
+            Light up every corner <span className="text-gradient">this Diwali</span>
+          </h2>
+          <p className="max-w-xl text-white/85 drop-shadow">
+            Genuine Sivakasi crackers at up to {s.maxDiscountPercent}% off, with FREE delivery on every order. Offer ends in:
+          </p>
+          <Countdown target={s.diwaliDate.toISOString()} compact />
+          <div className="flex flex-wrap justify-center gap-3">
+            <Link href="/products" className="btn btn-primary px-7">
+              Shop Now
+            </Link>
+            <Link href="/#combos" className="btn btn-ghost px-7">
+              Combo Packs
+            </Link>
           </div>
         </div>
       </section>

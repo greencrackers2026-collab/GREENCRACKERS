@@ -9,7 +9,16 @@ import { QtyStepper } from "./QtyStepper";
 import { CloseIcon, TrashIcon } from "@/components/ui/Icons";
 import { formatINR, unitLabel } from "@/lib/format";
 
-export function CartDrawer({ freeShippingAbove, minOrderValue }: { freeShippingAbove: number; minOrderValue: number }) {
+export function CartDrawer({
+  freeShippingAbove,
+  minOrderValue,
+  freeDeliveryCode,
+}: {
+  freeShippingAbove: number;
+  minOrderValue: number;
+  /** When a free-delivery coupon is auto-applied, show it instead of the threshold bar. */
+  freeDeliveryCode?: string | null;
+}) {
   const { items, isOpen, close, setQty, remove } = useCart();
   const hydrated = useHydrated();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -72,6 +81,11 @@ export function CartDrawer({ freeShippingAbove, minOrderValue }: { freeShippingA
             ) : (
               <>
                 <div className="px-5 pt-3">
+                  {freeDeliveryCode ? (
+                    <p className="rounded-xl bg-emerald-500/15 px-3 py-2 text-sm text-festive-green">
+                      🎉 FREE delivery with <b>{freeDeliveryCode}</b>, applied automatically at checkout
+                    </p>
+                  ) : (
                   <div className="rounded-xl bg-white/5 px-3 py-2 text-sm">
                     {toFree > 0 ? (
                       <span>
@@ -87,6 +101,7 @@ export function CartDrawer({ freeShippingAbove, minOrderValue }: { freeShippingA
                       />
                     </div>
                   </div>
+                  )}
                 </div>
                 <ul className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
                   {items.map((i) => (

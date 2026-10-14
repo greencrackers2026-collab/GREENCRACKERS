@@ -21,7 +21,7 @@ export default async function PrivacyPage() {
       </ul>
       <h2>How we use it</h2>
       <ul>
-        <li>To process, deliver and support your orders, including calling or messaging you on WhatsApp about your order.</li>
+        <li>To process, deliver and support your orders, including calling you about your order.</li>
         <li>To respond to quote requests.</li>
         <li>We do not sell your data. We share it only with delivery and payment partners as needed to fulfil your order.</li>
       </ul>

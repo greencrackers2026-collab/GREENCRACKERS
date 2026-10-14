@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import Image from "next/image";
+import { useActionState, useState } from "react";
 import { saveSettings } from "@/app/admin/actions";
 
 export type SettingsFormValues = {
@@ -15,6 +16,8 @@ export type SettingsFormValues = {
   autoOfferThreshold: number;
   autoOfferPercent: number;
   shippingFee: number;
+  codFee: number;
+  upiQrImage: string;
   freeShippingAbove: number;
   minOrderValue: number;
   codEnabled: boolean;
@@ -55,6 +58,21 @@ function Check({ name, label, def }: { name: string; label: string; def: boolean
 
 export function SettingsForm({ v }: { v: SettingsFormValues }) {
   const [state, action, pending] = useActionState(saveSettings, undefined);
+  const [qr, setQr] = useState(v.upiQrImage);
+  const [qrBusy, setQrBusy] = useState(false);
+  const [qrErr, setQrErr] = useState<string | null>(null);
+  async function uploadQr(file: File | undefined) {
+    if (!file) return;
+    setQrBusy(true);
+    setQrErr(null);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+    const data = await res.json().catch(() => ({}));
+    setQrBusy(false);
+    if (res.ok) setQr(data.url);
+    else setQrErr(data.error ?? "Upload failed");
+  }
   const section = "glass grid gap-4 rounded-2xl p-5 sm:grid-cols-2";
   const h = "text-lg font-semibold text-gold-300 sm:col-span-2";
 
@@ -93,7 +111,10 @@ export function SettingsForm({ v }: { v: SettingsFormValues }) {
         <Field label="Extra % off" hint="Set 0 to disable the automatic offer">
           <input name="autoOfferPercent" type="number" min={0} max={50} className="input" defaultValue={v.autoOfferPercent} />
         </Field>
-        <Field label="Delivery fee (₹)">
+        <Field label="COD charges per order (₹)" hint="Added to every Cash on Delivery order">
+          <input name="codFee" type="number" min={0} className="input" defaultValue={v.codFee} />
+        </Field>
+        <Field label="Delivery fee (₹)" hint="Waived by a Free-delivery coupon such as DIWALI10">
           <input name="shippingFee" type="number" min={0} className="input" defaultValue={v.shippingFee} />
         </Field>
         <Field label="Free delivery above (₹)">
@@ -113,7 +134,33 @@ export function SettingsForm({ v }: { v: SettingsFormValues }) {
             Razorpay: {v.razorpayEnabled ? <span className="text-festive-green">connected ✓</span> : "not configured (add RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET to .env)"}
           </p>
         </div>
-        <Field label="UPI ID">
+        <div className="sm:col-span-2">
+          <span className="label">UPI QR code (customers scan this, pay, then upload a screenshot)</span>
+          <input type="hidden" name="upiQrImage" value={qr} />
+          <div className="flex flex-wrap items-center gap-4">
+            {qr ? (
+              <div className="w-36 rounded-xl bg-white p-2">
+                <Image src={qr} alt="Current UPI QR" width={280} height={280} className="h-auto w-full" />
+              </div>
+            ) : (
+              <p className="text-sm text-saffron-400">No QR uploaded. The UPI option stays hidden until you add one (or a UPI ID).</p>
+            )}
+            <div className="flex flex-col gap-2">
+              <label className="btn btn-ghost cursor-pointer text-sm">
+                {qrBusy ? "Uploading…" : qr ? "Replace QR image" : "⬆ Upload QR image"}
+                <input type="file" accept="image/*" className="sr-only" onChange={(e) => uploadQr(e.target.files?.[0])} />
+              </label>
+              {qr && (
+                <button type="button" className="text-xs text-red-300 underline" onClick={() => setQr("")}>
+                  Remove QR
+                </button>
+              )}
+              {qrErr && <span className="text-xs text-red-300">{qrErr}</span>}
+            </div>
+          </div>
+          <span className="mt-1 block text-xs text-white/50">Click “Save all settings” after uploading.</span>
+        </div>
+        <Field label="UPI ID (optional)">
           <input name="upiId" className="input" defaultValue={v.upiId} placeholder="shopname@okaxis" />
         </Field>
         <Field label="UPI payee name">

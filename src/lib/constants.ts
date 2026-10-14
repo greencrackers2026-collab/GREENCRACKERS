@@ -17,7 +17,7 @@ export const QUOTE_STATUSES = ["NEW", "CONTACTED", "CLOSED"] as const;
 
 export const PAYMENT_METHOD_LABEL: Record<string, string> = {
   RAZORPAY: "Razorpay (UPI / Cards / Netbanking)",
-  UPI: "UPI (QR / UPI ID)",
+  UPI: "UPI (scan QR + upload screenshot)",
   COD: "Cash on Delivery",
 };
 

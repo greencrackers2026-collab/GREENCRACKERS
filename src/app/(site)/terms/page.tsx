@@ -19,7 +19,7 @@ export default async function TermsPage() {
       <ul>
         <li>You confirm that the sale, possession and use of crackers is permitted at your delivery location.</li>
         <li>You agree to use crackers only in permitted areas and time slots, following Supreme Court and local authority directions.</li>
-        <li>We may cancel and refund any order to a restricted area.</li>
+        <li>If we cannot deliver to your location, we will contact you by phone to arrange pickup or refund.</li>
       </ul>
       <h2>Pricing &amp; offers</h2>
       <ul>

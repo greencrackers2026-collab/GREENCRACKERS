@@ -16,10 +16,10 @@ export function checkPincode(
     return {
       ok: false,
       reason:
-        "Sorry, sale/delivery of crackers is restricted in your area. You can order on WhatsApp for pickup from our licensed shop.",
+        "Sorry, sale/delivery of crackers is restricted in your area. You can choose pickup from our licensed shop.",
     };
   const allowed = list(cfg.serviceablePrefixes);
   if (allowed.length && !allowed.some((p) => pincode.startsWith(p)))
-    return { ok: false, reason: "We don't deliver to this pincode yet. Please contact us on WhatsApp." };
+    return { ok: false, reason: "We don't deliver to this pincode yet. Please contact us." };
   return { ok: true };
 }

@@ -8,6 +8,7 @@ const bodySchema = z.object({
   lines: z.array(cartLineSchema).max(50),
   couponCode: z.string().trim().max(30).optional(),
   deliveryMode: z.enum(["DELIVERY", "PICKUP"]).optional(),
+  paymentMethod: z.enum(["RAZORPAY", "UPI", "COD"]).optional(),
 });
 
 export async function POST(req: Request) {

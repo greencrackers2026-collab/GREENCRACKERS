@@ -1,6 +1,6 @@
+import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { prisma } from "@/lib/db";
 import { getProductBySlug, getVisibleProducts } from "@/lib/catalog";
 import { getSettings } from "@/lib/settings";
 import { categoryLabel } from "@/lib/constants";
@@ -110,13 +110,12 @@ export default async function ProductPage({ params }: Props) {
             <PincodeChecker
               blockedPincodePrefixes={s.blockedPincodePrefixes}
               serviceablePrefixes={s.serviceablePrefixes}
-              whatsappNumber={s.whatsappNumber}
             />
           </div>
           <ul className="grid grid-cols-3 gap-2 text-center text-xs text-white/75">
             <li className="glass rounded-xl p-3">
               <TruckIcon className="mx-auto mb-1 text-gold-300" />
-              Free delivery above {formatINR(s.freeShippingAbove)}
+              {s.autoCoupon?.type === "FREESHIP" ? `FREE delivery with ${s.autoCoupon.code}` : `Free delivery above ${formatINR(s.freeShippingAbove)}`}
             </li>
             <li className="glass rounded-xl p-3">
               <ShieldIcon className="mx-auto mb-1 text-gold-300" />

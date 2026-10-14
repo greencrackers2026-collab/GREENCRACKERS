@@ -51,7 +51,7 @@ export default async function OffersPage() {
                   <tr key={c.id}>
                     <td className="py-2 font-mono font-semibold">{c.code}</td>
                     <td className="py-2">
-                      {c.type === "PERCENT" ? `${c.value}%` : formatINR(c.value)}
+                      {c.type === "FREESHIP" ? "Free delivery" : c.type === "PERCENT" ? `${c.value}%` : formatINR(c.value)}
                       {c.maxDiscount ? <span className="text-white/50"> (max {formatINR(c.maxDiscount)})</span> : null}
                     </td>
                     <td className="py-2">{formatINR(c.minOrder)}</td>
@@ -139,6 +139,8 @@ export default async function OffersPage() {
           autoOfferThreshold: s.autoOfferThreshold,
           autoOfferPercent: s.autoOfferPercent,
           shippingFee: s.shippingFee,
+          codFee: s.codFee,
+          upiQrImage: s.upiQrImage,
           freeShippingAbove: s.freeShippingAbove,
           minOrderValue: s.minOrderValue,
           codEnabled: s.codEnabled,

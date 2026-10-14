@@ -2,8 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { PaymentProofUpload } from "./PaymentProofUpload";
 
+/** Order page: attach (or replace) the UPI payment screenshot, with an optional UTR. */
 export function UpiRefForm({ orderId }: { orderId: string }) {
+  const [proof, setProof] = useState<string | null>(null);
   const [ref, setRef] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -11,14 +14,15 @@ export function UpiRefForm({ orderId }: { orderId: string }) {
 
   return (
     <form
-      className="space-y-2"
+      className="space-y-3"
       onSubmit={async (e) => {
         e.preventDefault();
+        if (!proof) return;
         setBusy(true);
         const res = await fetch(`/api/orders/${orderId}/upi`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ upiRef: ref }),
+          body: JSON.stringify({ paymentProof: proof, upiRef: ref }),
         });
         const data = await res.json().catch(() => ({}));
         setBusy(false);
@@ -28,15 +32,16 @@ export function UpiRefForm({ orderId }: { orderId: string }) {
         } else setMsg({ ok: false, text: data.error ?? "Could not save. Try again." });
       }}
     >
-      <label htmlFor="upi-ref" className="label">
-        After paying, enter the UPI transaction ID / UTR (12 digits)
-      </label>
-      <div className="flex gap-2">
-        <input id="upi-ref" className="input" value={ref} onChange={(e) => setRef(e.target.value.trim())} inputMode="text" placeholder="e.g. 412345678901" />
-        <button className="btn btn-primary shrink-0" disabled={busy || ref.length < 6}>
-          Submit
-        </button>
+      <PaymentProofUpload onUploaded={setProof} id="order-proof" />
+      <div>
+        <label htmlFor="upi-ref" className="label">
+          UPI transaction ID / UTR (optional)
+        </label>
+        <input id="upi-ref" className="input" value={ref} onChange={(e) => setRef(e.target.value.trim())} placeholder="e.g. 412345678901" />
       </div>
+      <button className="btn btn-primary" disabled={busy || !proof}>
+        {busy ? "Submitting…" : "Submit payment proof"}
+      </button>
       {msg && (
         <p className={`text-sm ${msg.ok ? "text-festive-green" : "text-red-200"}`} role="status">
           {msg.text}

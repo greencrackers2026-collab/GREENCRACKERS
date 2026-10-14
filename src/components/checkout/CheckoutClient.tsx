@@ -9,9 +9,10 @@ import { QtyStepper } from "@/components/cart/QtyStepper";
 import { checkoutSchema } from "@/lib/validation";
 import { checkPincode } from "@/lib/pincode";
 import { INDIAN_STATES, PAYMENT_METHOD_LABEL } from "@/lib/constants";
-import { formatINR, waLink } from "@/lib/format";
+import { formatINR } from "@/lib/format";
 import type { PublicSettings } from "@/lib/settings";
 import type { PriceQuote } from "@/lib/pricing";
+import { PaymentProofUpload } from "./PaymentProofUpload";
 
 type Fields = {
   name: string;
@@ -37,7 +38,7 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
 
   const methods = useMemo(
     () =>
-      [s.razorpayEnabled && "RAZORPAY", s.upiEnabled && s.upiId && "UPI", s.codEnabled && "COD"].filter(Boolean) as (
+      [s.upiAvailable && "UPI", s.razorpayEnabled && "RAZORPAY", s.codEnabled && "COD"].filter(Boolean) as (
         | "RAZORPAY"
         | "UPI"
         | "COD"
@@ -49,8 +50,12 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
   const [errors, setErrors] = useState<Partial<Record<keyof Fields | "form", string>>>({});
   const [deliveryMode, setDeliveryMode] = useState<"DELIVERY" | "PICKUP">("DELIVERY");
   const [paymentMethod, setPaymentMethod] = useState<"RAZORPAY" | "UPI" | "COD">(methods[0] ?? "COD");
-  const [couponInput, setCouponInput] = useState("");
-  const [coupon, setCoupon] = useState("");
+  // The store's highlighted coupon (e.g. DIWALI10 = free delivery) is pre-applied; customers can remove it.
+  const [couponInput, setCouponInput] = useState(s.autoCoupon?.code ?? "");
+  const [coupon, setCoupon] = useState(s.autoCoupon?.code ?? "");
+  const [paymentProof, setPaymentProof] = useState<string | null>(null);
+  const [upiRef, setUpiRef] = useState("");
+  const [copied, setCopied] = useState(false);
   const [quote, setQuote] = useState<PriceQuote | null>(null);
   const [pricing, setPricing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -84,7 +89,7 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
       fetch("/api/pricing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lines, couponCode: coupon || undefined, deliveryMode }),
+        body: JSON.stringify({ lines, couponCode: coupon || undefined, deliveryMode, paymentMethod }),
         signal: ctrl.signal,
       })
         .then((r) => r.json())
@@ -96,7 +101,7 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
       clearTimeout(t);
       ctrl.abort();
     };
-  }, [lines, coupon, deliveryMode, hydrated]);
+  }, [lines, coupon, deliveryMode, paymentMethod, hydrated]);
 
   const pin = f.pincode.length === 6 ? checkPincode(f.pincode, s) : null;
   const pinBlocked = deliveryMode === "DELIVERY" && pin && !pin.ok;
@@ -118,7 +123,12 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
       couponCode: quote?.couponCode || undefined,
       deliveryMode,
       paymentMethod,
+      ...(paymentMethod === "UPI" && { paymentProof: paymentProof ?? undefined, upiRef: upiRef || undefined }),
     };
+    if (paymentMethod === "UPI" && !paymentProof) {
+      setErrors({ form: "Please pay using the UPI QR and upload your payment screenshot." });
+      return;
+    }
     const parsed = checkoutSchema.safeParse(payload);
     if (!parsed.success) {
       const fe = parsed.error.flatten().fieldErrors as Record<string, string[] | undefined>;
@@ -265,13 +275,7 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
           </div>
           {pinBlocked && (
             <div className="mt-4 rounded-xl border border-saffron-500/40 bg-saffron-500/10 p-3 text-sm">
-              We can&apos;t deliver to this pincode. Choose <b>Pickup from shop</b> or{" "}
-              {s.whatsappNumber && (
-                <a className="font-semibold underline" target="_blank" rel="noopener noreferrer" href={waLink(s.whatsappNumber, `Hi, I want to order crackers. My pincode is ${f.pincode}.`)}>
-                  order on WhatsApp
-                </a>
-              )}
-              .
+              We can&apos;t deliver to this pincode. Choose <b>Pickup from shop</b> instead.
             </div>
           )}
         </fieldset>
@@ -280,7 +284,7 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
           <legend className="sr-only">Payment method</legend>
           <h2 className="mb-4 text-lg font-bold text-gold-300">3. Payment</h2>
           {methods.length === 0 ? (
-            <p className="text-white/70">Online ordering is paused. Please order on WhatsApp.</p>
+            <p className="text-white/70">Online ordering is paused. Please contact us to order.</p>
           ) : (
             <div className="space-y-3" role="radiogroup" aria-label="Payment method">
               {methods.map((m) => (
@@ -302,12 +306,67 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
                     <span className="block font-semibold">{PAYMENT_METHOD_LABEL[m]}</span>
                     <span className="text-sm text-white/65">
                       {m === "RAZORPAY" && "Pay securely with any UPI app, debit/credit card, netbanking or wallet."}
-                      {m === "UPI" && `Scan our QR or pay to ${s.upiId} after placing the order, then share the transaction ID.`}
-                      {m === "COD" && "Pay in cash when your order arrives."}
+                      {m === "UPI" && "Scan our UPI QR, pay, and upload the payment screenshot. Your order is confirmed after we verify it."}
+                      {m === "COD" && `Pay in cash when your order arrives. ₹${s.codFee} extra COD charges apply.`}
                     </span>
                   </span>
                 </label>
               ))}
+            </div>
+          )}
+          {paymentMethod === "UPI" && (
+            <div className="mt-4 grid gap-4 rounded-2xl border border-gold-400/30 bg-black/20 p-4 sm:grid-cols-[auto_1fr]">
+              {s.upiQrImage && (
+                <div className="mx-auto w-44 rounded-xl bg-white p-2">
+                  <Image src={s.upiQrImage} alt="UPI QR code to pay" width={320} height={320} className="h-auto w-full" />
+                </div>
+              )}
+              <div className="space-y-3">
+                <p className="text-sm text-white/80">
+                  <b className="text-gold-300">Step 1:</b> Scan the QR with GPay, PhonePe, Paytm or any UPI app and pay exactly{" "}
+                  <b className="text-lg text-gold-300">{quote ? formatINR(quote.total) : "…"}</b>
+                  {s.upiId && (
+                    <>
+                      {" "}(UPI ID <b className="font-mono">{s.upiId}</b>)
+                    </>
+                  )}
+                  .
+                </p>
+                {s.upiId && quote && (
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={`upi://pay?pa=${encodeURIComponent(s.upiId)}&pn=${encodeURIComponent(s.storeName)}&am=${quote.total}&cu=INR&tn=${encodeURIComponent("Crackers order")}`}
+                      className="btn btn-primary text-sm sm:hidden"
+                    >
+                      Pay {formatINR(quote.total)} with UPI app
+                    </a>
+                    <button
+                      type="button"
+                      className="btn btn-ghost text-sm"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(s.upiId).then(
+                          () => setCopied(true),
+                          () => setCopied(false),
+                        );
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                    >
+                      {copied ? "✓ Copied" : "Copy UPI ID"}
+                    </button>
+                  </div>
+                )}
+                <p className="text-xs text-white/55 sm:hidden">On a phone? Tap the button above, or take a screenshot of the QR and scan it from your UPI app&apos;s gallery option.</p>
+                <p className="text-sm text-white/80">
+                  <b className="text-gold-300">Step 2:</b> Upload the screenshot of the successful payment.
+                </p>
+                <PaymentProofUpload onUploaded={setPaymentProof} />
+                <div>
+                  <label htmlFor="f-upiref" className="label">
+                    UPI transaction ID / UTR (optional)
+                  </label>
+                  <input id="f-upiref" className="input" value={upiRef} onChange={(e) => setUpiRef(e.target.value.replace(/[^A-Za-z0-9]/g, ""))} maxLength={30} placeholder="e.g. 412345678901" />
+                </div>
+              </div>
             </div>
           )}
         </fieldset>
@@ -378,9 +437,10 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
           <dl className={`space-y-2 border-t border-white/10 pt-4 text-sm ${pricing ? "opacity-60" : ""}`} aria-busy={pricing}>
             <Row label="MRP total" value={quote ? <span className="line-through">{formatINR(quote.mrpTotal)}</span> : "…"} muted />
             <Row label="Sale price" value={quote ? formatINR(quote.subtotal) : "…"} />
-            {quote && quote.couponDiscount > 0 && <Row label={`Coupon (${quote.couponCode})`} value={`− ${formatINR(quote.couponDiscount)}`} green />}
             {quote && quote.autoDiscount > 0 && <Row label={`Extra ${s.autoOfferPercent}% off`} value={`− ${formatINR(quote.autoDiscount)}`} green />}
             <Row label="Delivery" value={quote ? (quote.shippingFee ? formatINR(quote.shippingFee) : "FREE") : "…"} />
+            {quote && quote.couponDiscount > 0 && <Row label={`Coupon (${quote.couponCode})`} value={`− ${formatINR(quote.couponDiscount)}`} green />}
+            {quote && quote.codFee > 0 && <Row label="COD charges" value={formatINR(quote.codFee)} />}
             <div className="flex justify-between border-t border-white/10 pt-3 text-lg font-bold">
               <dt>Total</dt>
               <dd>{quote ? formatINR(quote.total) : "…"}</dd>
@@ -407,9 +467,26 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
           <button
             type="submit"
             className="btn btn-primary w-full text-base"
-            disabled={submitting || pricing || !quote || !quote.meetsMinimum || quote.errors.length > 0 || methods.length === 0 || Boolean(pinBlocked)}
+            disabled={
+              submitting ||
+              pricing ||
+              !quote ||
+              !quote.meetsMinimum ||
+              quote.errors.length > 0 ||
+              methods.length === 0 ||
+              Boolean(pinBlocked) ||
+              (paymentMethod === "UPI" && !paymentProof)
+            }
           >
-            {submitting ? "Placing order…" : paymentMethod === "RAZORPAY" ? `Pay ${quote ? formatINR(quote.total) : ""}` : "Place Order"}
+            {submitting
+              ? "Placing order…"
+              : paymentMethod === "RAZORPAY"
+                ? `Pay ${quote ? formatINR(quote.total) : ""}`
+                : paymentMethod === "UPI"
+                  ? paymentProof
+                    ? "Submit Order for Verification"
+                    : "Upload payment screenshot first"
+                  : "Place Order"}
           </button>
           <p className="text-center text-xs text-white/50">
             By placing this order you agree to our <Link href="/terms" className="underline">Terms</Link> and confirm you are 18+.
