@@ -2,6 +2,7 @@ import { Navigate, useLocation, useNavigate } from "react-router";
 import { useState } from "react";
 import { useAdmin } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { EyeIcon, EyeOffIcon } from "@/components/ui/Icons";
 
 export function LoginPage() {
   const admin = useAdmin();
@@ -11,6 +12,7 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   if (admin.status === "admin") return <Navigate to={from} replace />;
 
@@ -54,15 +56,29 @@ export function LoginPage() {
             <label htmlFor="password" className="label">
               Password
             </label>
-            <input
-              id="password"
-              type="password"
-              className="input"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                className="input pr-12"
+                autoComplete="current-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-0 grid w-12 place-items-center rounded-r-xl text-white/60 hover:text-white"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+              >
+                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+              </button>
+            </div>
           </div>
           {error && (
             <p className="rounded-xl bg-red-500/15 p-2 text-sm text-red-200" role="alert">
