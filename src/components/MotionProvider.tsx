@@ -1,5 +1,3 @@
-"use client";
-
 import { LazyMotion, MotionConfig, domAnimation } from "framer-motion";
 
 /** LazyMotion keeps the framer-motion bundle small; MotionConfig honours prefers-reduced-motion. */

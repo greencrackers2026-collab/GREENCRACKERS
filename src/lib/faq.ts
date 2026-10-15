@@ -1,4 +1,4 @@
-import type { SiteSettings } from "./settings";
+import type { SiteSettings } from "./types";
 import { formatINR } from "./format";
 
 export function getFaqs(s: SiteSettings) {
@@ -8,10 +8,10 @@ export function getFaqs(s: SiteSettings) {
       a: "Yes. We source directly from licensed manufacturers in Sivakasi, Tamil Nadu, including Cornation, Balaji's, Sarvam, Blue Stars and Rathnaa's. That is how we can offer 50% to 70% off MRP.",
     },
     {
-      q: `How does the ${s.maxDiscountPercent}% OFF pre-Diwali offer work?`,
+      q: `How does the ${s.max_discount_percent}% OFF pre-Diwali offer work?`,
       a: `All listed prices are already discounted (MRP shown struck through).${
-        s.autoCoupon?.type === "FREESHIP" ? ` Code ${s.autoCoupon.code} is applied automatically at checkout for FREE delivery.` : ""
-      } Orders above ${formatINR(s.autoOfferThreshold)} also get an automatic extra ${s.autoOfferPercent}% off.`,
+        s.auto_coupon?.type === "FREESHIP" ? ` Code ${s.auto_coupon.code} is applied automatically at checkout for FREE delivery.` : ""
+      } Orders above ${formatINR(s.auto_offer_threshold)} also get an automatic extra ${s.auto_offer_percent}% off.`,
     },
     {
       q: "Do you deliver to my city?",
@@ -19,7 +19,7 @@ export function getFaqs(s: SiteSettings) {
     },
     {
       q: "What payment options are available?",
-      a: `Pay by UPI: scan our QR at checkout, pay, and upload the payment screenshot. We confirm your order after verifying it. Or choose Cash on Delivery (₹${s.codFee} extra COD charges).`,
+      a: `Pay by UPI: scan our QR at checkout, pay, and upload the payment screenshot. We confirm your order after verifying it. Or choose Cash on Delivery (₹${s.cod_fee} extra COD charges).`,
     },
     {
       q: "Do you sell green crackers?",
@@ -31,11 +31,11 @@ export function getFaqs(s: SiteSettings) {
     },
     {
       q: `Is there a delivery charge?`,
-      a: `Delivery charge is ${formatINR(s.shippingFee)}${
-        s.autoCoupon?.type === "FREESHIP" ? `, waived with code ${s.autoCoupon.code} (applied automatically)` : ""
-      }. Delivery is also free on orders above ${formatINR(s.freeShippingAbove)}. Cash on Delivery orders have ${formatINR(
-        s.codFee,
-      )} extra COD charges. Minimum order value is ${formatINR(s.minOrderValue)}.`,
+      a: `Delivery charge is ${formatINR(s.shipping_fee)}${
+        s.auto_coupon?.type === "FREESHIP" ? `, waived with code ${s.auto_coupon.code} (applied automatically)` : ""
+      }. Delivery is also free on orders above ${formatINR(s.free_shipping_above)}. Cash on Delivery orders have ${formatINR(
+        s.cod_fee,
+      )} extra COD charges. Minimum order value is ${formatINR(s.min_order_value)}.`,
     },
   ];
 }

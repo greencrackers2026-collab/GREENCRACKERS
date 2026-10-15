@@ -1,6 +1,4 @@
-"use client";
-
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router";
 import { useState } from "react";
 import { QtyStepper } from "@/components/cart/QtyStepper";
 import { AddToCartButton } from "@/components/cart/AddToCartButton";
@@ -11,7 +9,7 @@ export function BuyBox({ item, stock, bulk }: { item: Omit<CartItem, "qty">; sto
   const [qty, setQty] = useState(item.min);
   const add = useCart((s) => s.add);
   const close = useCart((s) => s.close);
-  const router = useRouter();
+  const navigate = useNavigate();
   const out = stock <= 0;
   const q = Math.max(qty, item.min);
 
@@ -46,7 +44,7 @@ export function BuyBox({ item, stock, bulk }: { item: Omit<CartItem, "qty">; sto
           onClick={() => {
             add(item, q);
             close();
-            router.push("/checkout");
+            navigate("/checkout");
           }}
         >
           Buy Now

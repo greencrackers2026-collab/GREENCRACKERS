@@ -1,14 +1,18 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CloseIcon } from "@/components/ui/Icons";
 
+const KEY = "restriction-dismissed";
+
+const dismissed = () => {
+  try {
+    return sessionStorage.getItem(KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
 export function RestrictionBanner({ text }: { text: string }) {
-  // Rendered visible on the server (no layout shift); hidden after mount only if dismissed this session.
-  const [hidden, setHidden] = useState(false);
-  useEffect(() => {
-    setHidden(sessionStorage.getItem("restriction-dismissed") === "1");
-  }, []);
+  const [hidden, setHidden] = useState(dismissed);
   if (hidden) return null;
   return (
     <div role="note" className="border-b border-saffron-500/30 bg-maroon-900/90 text-sm text-white">
@@ -21,7 +25,9 @@ export function RestrictionBanner({ text }: { text: string }) {
         <button
           className="grid h-8 w-8 shrink-0 place-items-center rounded-full hover:bg-white/10"
           onClick={() => {
-            sessionStorage.setItem("restriction-dismissed", "1");
+            try {
+              sessionStorage.setItem(KEY, "1");
+            } catch {}
             setHidden(true);
           }}
           aria-label="Dismiss notice"

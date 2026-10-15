@@ -1,16 +1,35 @@
-"use client";
+import { useState } from "react";
+import { errorMessage } from "@/lib/supabase";
 
-import { useFormStatus } from "react-dom";
-
-/** A <select> that submits its parent form as soon as it changes (used for quick status updates). */
-export function AutoSubmitSelect({ name, defaultValue, options, label }: { name: string; defaultValue: string; options: readonly string[]; label: string }) {
+/** A <select> that saves as soon as it changes (used for quick status updates). */
+export function AutoSaveSelect({
+  value,
+  options,
+  label,
+  onSave,
+}: {
+  value: string;
+  options: readonly string[];
+  label: string;
+  onSave: (value: string) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
   return (
     <select
-      name={name}
-      defaultValue={defaultValue}
+      value={value}
       aria-label={label}
-      className="input !min-h-9 !py-1 text-sm"
-      onChange={(e) => e.currentTarget.form?.requestSubmit()}
+      disabled={busy}
+      className="input !min-h-10 w-full min-w-[9.5rem] !py-1 text-sm"
+      onChange={async (e) => {
+        setBusy(true);
+        try {
+          await onSave(e.target.value);
+        } catch (err) {
+          alert(errorMessage(err));
+        } finally {
+          setBusy(false);
+        }
+      }}
     >
       {options.map((o) => (
         <option key={o} value={o}>
@@ -21,17 +40,37 @@ export function AutoSubmitSelect({ name, defaultValue, options, label }: { name:
   );
 }
 
-export function SubmitButton({ children, className = "btn btn-primary", confirm }: { children: React.ReactNode; className?: string; confirm?: string }) {
-  const { pending } = useFormStatus();
+/** Button that runs an async action, optionally after a confirm() prompt, and shows a busy state. */
+export function ActionButton({
+  children,
+  onClick,
+  className = "btn btn-primary",
+  confirm,
+}: {
+  children: React.ReactNode;
+  onClick: () => Promise<void>;
+  className?: string;
+  confirm?: string;
+}) {
+  const [busy, setBusy] = useState(false);
   return (
     <button
+      type="button"
       className={className}
-      disabled={pending}
-      onClick={(e) => {
-        if (confirm && !window.confirm(confirm)) e.preventDefault();
+      disabled={busy}
+      onClick={async () => {
+        if (confirm && !window.confirm(confirm)) return;
+        setBusy(true);
+        try {
+          await onClick();
+        } catch (err) {
+          alert(errorMessage(err));
+        } finally {
+          setBusy(false);
+        }
       }}
     >
-      {pending ? "Saving…" : children}
+      {busy ? "Saving…" : children}
     </button>
   );
 }
@@ -42,4 +81,18 @@ export function PrintButton() {
       🖨️ Print
     </button>
   );
+}
+
+/** Loading / error placeholder shared by admin pages. */
+export function LoadState({ error, onRetry }: { error: string | null; onRetry: () => void }) {
+  if (error)
+    return (
+      <div className="glass rounded-2xl p-6 text-center">
+        <p className="text-red-200">{error}</p>
+        <button className="btn btn-ghost mt-3 text-sm" onClick={onRetry}>
+          Try again
+        </button>
+      </div>
+    );
+  return <div className="glass h-64 animate-pulse rounded-2xl" aria-busy="true" />;
 }

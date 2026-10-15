@@ -1,8 +1,5 @@
-"use client";
-
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { useEffect, useState } from "react";
 
 export type CartItem = {
   kind: "PRODUCT" | "COMBO";
@@ -10,7 +7,7 @@ export type CartItem = {
   slug: string;
   name: string;
   image: string;
-  /** Display-only snapshot; the server re-prices everything at checkout. */
+  /** Display-only snapshot; price_cart() in the database re-prices everything at checkout. */
   price: number;
   mrp: number;
   unit: string;
@@ -59,19 +56,12 @@ export const useCart = create<CartState>()(
       close: () => set({ isOpen: false }),
     }),
     {
-      name: "diwali-cart-v1",
+      name: "diwali-cart-v2",
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({ items: s.items }),
     },
   ),
 );
-
-/** Avoids hydration mismatches for values that come from localStorage. */
-export function useHydrated() {
-  const [h, setH] = useState(false);
-  useEffect(() => setH(true), []);
-  return h;
-}
 
 export const cartCount = (items: CartItem[]) => items.reduce((a, i) => a + (i.unit === "piece" ? 1 : i.qty), 0);
 export const cartSubtotal = (items: CartItem[]) => items.reduce((a, i) => a + i.price * i.qty, 0);

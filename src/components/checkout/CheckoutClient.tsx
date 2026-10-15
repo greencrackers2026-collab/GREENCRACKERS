@@ -1,17 +1,13 @@
-"use client";
-
-import Image from "next/image";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link, useNavigate } from "react-router";
 import { useEffect, useMemo, useState } from "react";
-import { useCart, useHydrated } from "@/components/cart/cart-store";
+import { useCart } from "@/components/cart/cart-store";
 import { QtyStepper } from "@/components/cart/QtyStepper";
-import { checkoutSchema } from "@/lib/validation";
+import { checkoutSchema, fieldErrors } from "@/lib/validation";
 import { checkPincode } from "@/lib/pincode";
 import { INDIAN_STATES, PAYMENT_METHOD_LABEL } from "@/lib/constants";
 import { formatINR } from "@/lib/format";
-import type { PublicSettings } from "@/lib/settings";
-import type { PriceQuote } from "@/lib/pricing";
+import { errorMessage, supabase } from "@/lib/supabase";
+import type { DeliveryMode, PaymentMethod, PriceQuote, SiteSettings } from "@/lib/types";
 import { PaymentProofUpload } from "./PaymentProofUpload";
 
 type Fields = {
@@ -29,30 +25,34 @@ type Fields = {
 const EMPTY: Fields = { name: "", phone: "", email: "", address1: "", address2: "", city: "", state: "Tamil Nadu", pincode: "", notes: "" };
 const DRAFT_KEY = "checkout-draft-v1";
 
-export function CheckoutClient({ s }: { s: PublicSettings }) {
-  const router = useRouter();
-  const hydrated = useHydrated();
+const loadDraft = (): Fields => {
+  try {
+    const d = localStorage.getItem(DRAFT_KEY);
+    return d ? { ...EMPTY, ...JSON.parse(d) } : EMPTY;
+  } catch {
+    return EMPTY;
+  }
+};
+
+export function CheckoutClient({ s }: { s: SiteSettings }) {
+  const navigate = useNavigate();
   const items = useCart((st) => st.items);
   const setQty = useCart((st) => st.setQty);
   const clear = useCart((st) => st.clear);
 
   const methods = useMemo(
-    () =>
-      [s.upiAvailable && "UPI", s.razorpayEnabled && "RAZORPAY", s.codEnabled && "COD"].filter(Boolean) as (
-        | "RAZORPAY"
-        | "UPI"
-        | "COD"
-      )[],
+    () => [s.upi_available && "UPI", s.cod_enabled && "COD"].filter(Boolean) as PaymentMethod[],
     [s],
   );
 
-  const [f, setF] = useState<Fields>(EMPTY);
+  // Address draft is restored from / saved to this browser so a refresh doesn't lose it.
+  const [f, setF] = useState<Fields>(loadDraft);
   const [errors, setErrors] = useState<Partial<Record<keyof Fields | "form", string>>>({});
-  const [deliveryMode, setDeliveryMode] = useState<"DELIVERY" | "PICKUP">("DELIVERY");
-  const [paymentMethod, setPaymentMethod] = useState<"RAZORPAY" | "UPI" | "COD">(methods[0] ?? "COD");
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("DELIVERY");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(methods[0] ?? "COD");
   // The store's highlighted coupon (e.g. DIWALI10 = free delivery) is pre-applied; customers can remove it.
-  const [couponInput, setCouponInput] = useState(s.autoCoupon?.code ?? "");
-  const [coupon, setCoupon] = useState(s.autoCoupon?.code ?? "");
+  const [couponInput, setCouponInput] = useState(s.auto_coupon?.code ?? "");
+  const [coupon, setCoupon] = useState(s.auto_coupon?.code ?? "");
   const [paymentProof, setPaymentProof] = useState<string | null>(null);
   const [upiRef, setUpiRef] = useState("");
   const [copied, setCopied] = useState(false);
@@ -60,48 +60,39 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
   const [pricing, setPricing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Restore / persist the address draft locally so a refresh doesn't lose it.
   useEffect(() => {
-    try {
-      const d = localStorage.getItem(DRAFT_KEY);
-      if (d) setF({ ...EMPTY, ...JSON.parse(d) });
-    } catch {}
-  }, []);
-  useEffect(() => {
-    if (!hydrated) return;
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...f, notes: "" }));
     } catch {}
-  }, [f, hydrated]);
+  }, [f]);
 
   const lines = useMemo(() => items.map((i) => ({ kind: i.kind, id: i.id, qty: i.qty })), [items]);
 
-  // Server re-prices the cart (coupon, auto offer, shipping) whenever anything relevant changes.
+  // The database re-prices the cart (coupon, auto offer, shipping) whenever anything relevant changes.
   useEffect(() => {
-    if (!hydrated) return;
     if (!lines.length) {
       setQuote(null);
       return;
     }
-    const ctrl = new AbortController();
+    let stale = false;
     setPricing(true);
-    const t = setTimeout(() => {
-      fetch("/api/pricing", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lines, couponCode: coupon || undefined, deliveryMode, paymentMethod }),
-        signal: ctrl.signal,
-      })
-        .then((r) => r.json())
-        .then((q: PriceQuote) => setQuote(q))
-        .catch(() => {})
-        .finally(() => setPricing(false));
+    const t = setTimeout(async () => {
+      const { data, error } = await supabase.rpc("price_cart", {
+        p_lines: lines,
+        p_coupon_code: coupon || null,
+        p_delivery_mode: deliveryMode,
+        p_payment_method: paymentMethod,
+      });
+      if (stale) return;
+      if (error) setErrors((p) => ({ ...p, form: errorMessage(error, "Could not calculate prices. Please refresh.") }));
+      else setQuote(data as PriceQuote);
+      setPricing(false);
     }, 250);
     return () => {
+      stale = true;
       clearTimeout(t);
-      ctrl.abort();
     };
-  }, [lines, coupon, deliveryMode, paymentMethod, hydrated]);
+  }, [lines, coupon, deliveryMode, paymentMethod]);
 
   const pin = f.pincode.length === 6 ? checkPincode(f.pincode, s) : null;
   const pinBlocked = deliveryMode === "DELIVERY" && pin && !pin.ok;
@@ -114,27 +105,13 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
 
   async function placeOrder(e: React.FormEvent) {
     e.preventDefault();
-    const payload = {
-      lines,
-      ...f,
-      email: f.email || undefined,
-      address2: f.address2 || undefined,
-      notes: f.notes || undefined,
-      couponCode: quote?.couponCode || undefined,
-      deliveryMode,
-      paymentMethod,
-      ...(paymentMethod === "UPI" && { paymentProof: paymentProof ?? undefined, upiRef: upiRef || undefined }),
-    };
     if (paymentMethod === "UPI" && !paymentProof) {
       setErrors({ form: "Please pay using the UPI QR and upload your payment screenshot." });
       return;
     }
-    const parsed = checkoutSchema.safeParse(payload);
+    const parsed = checkoutSchema.safeParse(f);
     if (!parsed.success) {
-      const fe = parsed.error.flatten().fieldErrors as Record<string, string[] | undefined>;
-      const next: typeof errors = {};
-      for (const k of Object.keys(fe)) next[k as keyof Fields] = fe[k]?.[0];
-      setErrors(next);
+      setErrors(fieldErrors(parsed.error));
       document.querySelector<HTMLElement>("[aria-invalid='true']")?.focus();
       return;
     }
@@ -144,37 +121,31 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
     }
     setSubmitting(true);
     setErrors({});
-    try {
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        const fe = (data.fieldErrors ?? {}) as Record<string, string[] | undefined>;
-        const next: typeof errors = { form: data.error };
-        for (const k of Object.keys(fe)) next[k as keyof Fields] = fe[k]?.[0];
-        setErrors(next);
-        setSubmitting(false);
-        return;
-      }
-      clear();
-      router.push(`/order/${data.id}${data.paymentMethod === "RAZORPAY" ? "?pay=1" : ""}`);
-    } catch {
-      setErrors({ form: "Network error. Please check your connection and try again." });
+    const { data, error } = await supabase.rpc("place_order", {
+      p: {
+        lines,
+        ...parsed.data,
+        coupon_code: quote?.coupon_code ?? null,
+        delivery_mode: deliveryMode,
+        payment_method: paymentMethod,
+        ...(paymentMethod === "UPI" && { payment_proof: paymentProof, upi_ref: upiRef || null }),
+      },
+    });
+    if (error) {
+      setErrors({ form: errorMessage(error) });
       setSubmitting(false);
+      return;
     }
+    clear();
+    navigate(`/order/${(data as { id: string }).id}`);
   }
-
-  if (!hydrated) return <div className="glass h-96 animate-pulse rounded-3xl" aria-busy="true" />;
 
   if (!items.length)
     return (
       <div className="glass mx-auto max-w-lg rounded-3xl p-10 text-center">
         <p className="text-5xl" aria-hidden="true">🪔</p>
         <p className="mt-4 text-lg">Your cart is empty.</p>
-        <Link href="/products" className="btn btn-primary mt-6">
+        <Link to="/products" className="btn btn-primary mt-6">
           Browse Crackers
         </Link>
       </div>
@@ -305,9 +276,8 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
                   <span>
                     <span className="block font-semibold">{PAYMENT_METHOD_LABEL[m]}</span>
                     <span className="text-sm text-white/65">
-                      {m === "RAZORPAY" && "Pay securely with any UPI app, debit/credit card, netbanking or wallet."}
                       {m === "UPI" && "Scan our UPI QR, pay, and upload the payment screenshot. Your order is confirmed after we verify it."}
-                      {m === "COD" && `Pay in cash when your order arrives. ₹${s.codFee} extra COD charges apply.`}
+                      {m === "COD" && `Pay in cash when your order arrives. ₹${s.cod_fee} extra COD charges apply.`}
                     </span>
                   </span>
                 </label>
@@ -316,26 +286,26 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
           )}
           {paymentMethod === "UPI" && (
             <div className="mt-4 grid gap-4 rounded-2xl border border-gold-400/30 bg-black/20 p-4 sm:grid-cols-[auto_1fr]">
-              {s.upiQrImage && (
+              {s.upi_qr_image && (
                 <div className="mx-auto w-44 rounded-xl bg-white p-2">
-                  <Image src={s.upiQrImage} alt="UPI QR code to pay" width={320} height={320} className="h-auto w-full" />
+                  <img src={s.upi_qr_image} alt="UPI QR code to pay" width={320} height={320} className="h-auto w-full" />
                 </div>
               )}
               <div className="space-y-3">
                 <p className="text-sm text-white/80">
                   <b className="text-gold-300">Step 1:</b> Scan the QR with GPay, PhonePe, Paytm or any UPI app and pay exactly{" "}
                   <b className="text-lg text-gold-300">{quote ? formatINR(quote.total) : "…"}</b>
-                  {s.upiId && (
+                  {s.upi_id && (
                     <>
-                      {" "}(UPI ID <b className="font-mono">{s.upiId}</b>)
+                      {" "}(UPI ID <b className="font-mono">{s.upi_id}</b>)
                     </>
                   )}
                   .
                 </p>
-                {s.upiId && quote && (
+                {s.upi_id && quote && (
                   <div className="flex flex-wrap gap-2">
                     <a
-                      href={`upi://pay?pa=${encodeURIComponent(s.upiId)}&pn=${encodeURIComponent(s.storeName)}&am=${quote.total}&cu=INR&tn=${encodeURIComponent("Crackers order")}`}
+                      href={`upi://pay?pa=${encodeURIComponent(s.upi_id)}&pn=${encodeURIComponent(s.store_name)}&am=${quote.total}&cu=INR&tn=${encodeURIComponent("Crackers order")}`}
                       className="btn btn-primary text-sm sm:hidden"
                     >
                       Pay {formatINR(quote.total)} with UPI app
@@ -344,7 +314,7 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
                       type="button"
                       className="btn btn-ghost text-sm"
                       onClick={() => {
-                        navigator.clipboard?.writeText(s.upiId).then(
+                        navigator.clipboard?.writeText(s.upi_id).then(
                           () => setCopied(true),
                           () => setCopied(false),
                         );
@@ -380,7 +350,7 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
           <ul className="max-h-72 space-y-3 overflow-y-auto pr-1">
             {items.map((i) => (
               <li key={`${i.kind}-${i.id}`} className="flex gap-3">
-                <Image src={i.image} alt="" width={56} height={56} className="h-14 w-14 rounded-xl object-cover" />
+                <img src={i.image} alt="" width={56} height={56} loading="lazy" className="h-14 w-14 rounded-xl object-cover" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{i.name}</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
@@ -421,9 +391,9 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
                 </button>
               )}
             </div>
-            {coupon && quote?.couponMessage && (
-              <p className={`mt-1 text-sm ${quote.couponCode ? "text-festive-green" : "text-red-300"}`} role="status">
-                {quote.couponMessage}
+            {coupon && quote?.coupon_message && (
+              <p className={`mt-1 text-sm ${quote.coupon_code ? "text-festive-green" : "text-red-300"}`} role="status">
+                {quote.coupon_message}
               </p>
             )}
           </div>
@@ -435,12 +405,12 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
           ))}
 
           <dl className={`space-y-2 border-t border-white/10 pt-4 text-sm ${pricing ? "opacity-60" : ""}`} aria-busy={pricing}>
-            <Row label="MRP total" value={quote ? <span className="line-through">{formatINR(quote.mrpTotal)}</span> : "…"} muted />
+            <Row label="MRP total" value={quote ? <span className="line-through">{formatINR(quote.mrp_total)}</span> : "…"} muted />
             <Row label="Sale price" value={quote ? formatINR(quote.subtotal) : "…"} />
-            {quote && quote.autoDiscount > 0 && <Row label={`Extra ${s.autoOfferPercent}% off`} value={`− ${formatINR(quote.autoDiscount)}`} green />}
-            <Row label="Delivery" value={quote ? (quote.shippingFee ? formatINR(quote.shippingFee) : "FREE") : "…"} />
-            {quote && quote.couponDiscount > 0 && <Row label={`Coupon (${quote.couponCode})`} value={`− ${formatINR(quote.couponDiscount)}`} green />}
-            {quote && quote.codFee > 0 && <Row label="COD charges" value={formatINR(quote.codFee)} />}
+            {quote && quote.auto_discount > 0 && <Row label={`Extra ${s.auto_offer_percent}% off`} value={`− ${formatINR(quote.auto_discount)}`} green />}
+            <Row label="Delivery" value={quote ? (quote.shipping_fee ? formatINR(quote.shipping_fee) : "FREE") : "…"} />
+            {quote && quote.coupon_discount > 0 && <Row label={`Coupon (${quote.coupon_code})`} value={`− ${formatINR(quote.coupon_discount)}`} green />}
+            {quote && quote.cod_fee > 0 && <Row label="COD charges" value={formatINR(quote.cod_fee)} />}
             <div className="flex justify-between border-t border-white/10 pt-3 text-lg font-bold">
               <dt>Total</dt>
               <dd>{quote ? formatINR(quote.total) : "…"}</dd>
@@ -450,9 +420,9 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
                 🎉 You save {formatINR(quote.savings)} on this order!
               </p>
             )}
-            {quote && quote.subtotal < s.autoOfferThreshold && s.autoOfferPercent > 0 && (
+            {quote && quote.subtotal < s.auto_offer_threshold && s.auto_offer_percent > 0 && (
               <p className="text-center text-xs text-white/60">
-                Add {formatINR(s.autoOfferThreshold - quote.subtotal)} more to get an extra {s.autoOfferPercent}% off
+                Add {formatINR(s.auto_offer_threshold - quote.subtotal)} more to get an extra {s.auto_offer_percent}% off
               </p>
             )}
           </dl>
@@ -462,7 +432,7 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
               {errors.form}
             </p>
           )}
-          {quote && !quote.meetsMinimum && <p className="text-sm text-saffron-400">Minimum order value is {formatINR(s.minOrderValue)}.</p>}
+          {quote && !quote.meets_minimum && <p className="text-sm text-saffron-400">Minimum order value is {formatINR(s.min_order_value)}.</p>}
 
           <button
             type="submit"
@@ -471,7 +441,7 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
               submitting ||
               pricing ||
               !quote ||
-              !quote.meetsMinimum ||
+              !quote.meets_minimum ||
               quote.errors.length > 0 ||
               methods.length === 0 ||
               Boolean(pinBlocked) ||
@@ -480,16 +450,14 @@ export function CheckoutClient({ s }: { s: PublicSettings }) {
           >
             {submitting
               ? "Placing order…"
-              : paymentMethod === "RAZORPAY"
-                ? `Pay ${quote ? formatINR(quote.total) : ""}`
-                : paymentMethod === "UPI"
-                  ? paymentProof
-                    ? "Submit Order for Verification"
-                    : "Upload payment screenshot first"
-                  : "Place Order"}
+              : paymentMethod === "UPI"
+                ? paymentProof
+                  ? "Submit Order for Verification"
+                  : "Upload payment screenshot first"
+                : "Place Order"}
           </button>
           <p className="text-center text-xs text-white/50">
-            By placing this order you agree to our <Link href="/terms" className="underline">Terms</Link> and confirm you are 18+.
+            By placing this order you agree to our <Link to="/terms" className="underline">Terms</Link> and confirm you are 18+.
           </p>
         </div>
       </aside>

@@ -1,12 +1,11 @@
-"use client";
-
 import { useState } from "react";
-import { quoteSchema } from "@/lib/validation";
+import { fieldErrors, quoteSchema } from "@/lib/validation";
+import { errorMessage, supabase } from "@/lib/supabase";
 import { PlusIcon, TrashIcon } from "@/components/ui/Icons";
 
 type Row = { product: string; qty: string };
 
-export function QuoteForm({ productOptions, storeName }: { productOptions: string[]; storeName: string }) {
+export function QuoteForm({ productOptions }: { productOptions: string[] }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -15,12 +14,7 @@ export function QuoteForm({ productOptions, storeName }: { productOptions: strin
   const [rows, setRows] = useState<Row[]>([{ product: productOptions[0] ?? "", qty: "10" }]);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<string | null>(null);
-
-  const summary = () =>
-    `Hi ${storeName}, bulk quote request:\nName: ${name}\nPhone: ${phone}\nCity: ${city}\n` +
-    rows.filter((r) => r.product).map((r) => `• ${r.product} × ${r.qty}`).join("\n") +
-    (message ? `\nNote: ${message}` : "");
+  const [done, setDone] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,20 +28,18 @@ export function QuoteForm({ productOptions, storeName }: { productOptions: strin
     };
     const parsed = quoteSchema.safeParse(payload);
     if (!parsed.success) {
-      const fe = parsed.error.flatten().fieldErrors as Record<string, string[] | undefined>;
-      setErrors(Object.fromEntries(Object.entries(fe).map(([k, v]) => [k, v?.[0]])));
+      setErrors(fieldErrors(parsed.error));
       return;
     }
     setBusy(true);
     setErrors({});
-    const res = await fetch("/api/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    const data = await res.json().catch(() => ({}));
+    const { error } = await supabase.from("quotes").insert({ ...parsed.data, email: parsed.data.email ?? null, message: parsed.data.message ?? null });
     setBusy(false);
-    if (!res.ok) {
-      setErrors({ form: data.error ?? "Could not submit. Please try again." });
+    if (error) {
+      setErrors({ form: errorMessage(error, "Could not submit. Please try again.") });
       return;
     }
-    setDone(data.id);
+    setDone(true);
   }
 
   if (done)

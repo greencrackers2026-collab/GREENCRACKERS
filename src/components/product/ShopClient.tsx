@@ -1,6 +1,4 @@
-"use client";
-
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "react-router";
 import { useMemo } from "react";
 import type { ProductView } from "@/lib/catalog";
 import { CATEGORIES } from "@/lib/constants";
@@ -16,22 +14,19 @@ const SORTS = [
 ] as const;
 
 export function ShopClient({ products }: { products: ProductView[] }) {
-  const params = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
+  const [params, setParams] = useSearchParams();
   const category = params.get("category") ?? "";
   const q = params.get("q") ?? "";
   const sort = params.get("sort") ?? "popular";
   const greenOnly = params.get("green") === "1";
 
   const update = (patch: Record<string, string>) => {
-    const next = new URLSearchParams(params.toString());
+    const next = new URLSearchParams(params);
     for (const [k, v] of Object.entries(patch)) {
       if (v) next.set(k, v);
       else next.delete(k);
     }
-    const qs = next.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    setParams(next, { replace: true, preventScrollReset: true });
   };
 
   const list = useMemo(() => {
@@ -39,8 +34,8 @@ export function ShopClient({ products }: { products: ProductView[] }) {
     const out = products.filter(
       (p) =>
         (!category || p.category === category) &&
-        (!greenOnly || p.isGreen) &&
-        (!needle || `${p.name} ${p.brand} ${p.shortDesc}`.toLowerCase().includes(needle)),
+        (!greenOnly || p.is_green) &&
+        (!needle || `${p.name} ${p.brand} ${p.short_desc}`.toLowerCase().includes(needle)),
     );
     switch (sort) {
       case "price-asc":
@@ -50,7 +45,7 @@ export function ShopClient({ products }: { products: ProductView[] }) {
       case "discount":
         return [...out].sort((a, b) => discountPercent(b.mrp, b.price) - discountPercent(a.mrp, a.price));
       default:
-        return [...out].sort((a, b) => Number(b.isBestSeller) - Number(a.isBestSeller) || a.sortOrder - b.sortOrder);
+        return [...out].sort((a, b) => Number(b.is_best_seller) - Number(a.is_best_seller) || a.sort_order - b.sort_order);
     }
   }, [products, category, q, sort, greenOnly]);
 

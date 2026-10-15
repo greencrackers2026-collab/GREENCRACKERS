@@ -1,11 +1,6 @@
 import { z } from "zod";
 
-export const cartLineSchema = z.object({
-  kind: z.enum(["PRODUCT", "COMBO"]),
-  id: z.string().min(1).max(64),
-  qty: z.number().int().min(1).max(10000),
-});
-export type CartLineInput = z.infer<typeof cartLineSchema>;
+// Client-side validation for instant feedback. The database functions re-validate everything.
 
 export const phoneSchema = z
   .string()
@@ -27,7 +22,6 @@ const optionalEmail = z
   .refine((s) => !s || z.string().email().safeParse(s).success, "Enter a valid email");
 
 export const checkoutSchema = z.object({
-  lines: z.array(cartLineSchema).min(1, "Your cart is empty").max(50),
   name: z.string().trim().min(2, "Enter your full name").max(80),
   phone: phoneSchema,
   email: optionalEmail,
@@ -37,14 +31,6 @@ export const checkoutSchema = z.object({
   state: z.string().trim().min(2, "Select your state").max(60),
   pincode: pincodeSchema,
   notes: z.string().trim().max(500).optional(),
-  couponCode: z.string().trim().max(30).optional(),
-  deliveryMode: z.enum(["DELIVERY", "PICKUP"]).default("DELIVERY"),
-  paymentMethod: z.enum(["RAZORPAY", "UPI", "COD"]),
-  upiRef: z.string().trim().max(40).optional(),
-  paymentProof: z
-    .string()
-    .regex(/^[a-f0-9]{32}\.webp$/)
-    .optional(),
 });
 
 export const quoteSchema = z.object({
@@ -58,3 +44,9 @@ export const quoteSchema = z.object({
     .max(30),
   message: z.string().trim().max(1000).optional(),
 });
+
+/** First error message per field, for forms. */
+export function fieldErrors(error: z.ZodError) {
+  const fe = error.flatten().fieldErrors as Record<string, string[] | undefined>;
+  return Object.fromEntries(Object.entries(fe).map(([k, v]) => [k, v?.[0]])) as Record<string, string | undefined>;
+}

@@ -1,6 +1,3 @@
-"use client";
-
-import Image from "next/image";
 import { useState } from "react";
 
 export function ProductGallery({ images, alt }: { images: string[]; alt: string }) {
@@ -8,14 +5,7 @@ export function ProductGallery({ images, alt }: { images: string[]; alt: string 
   return (
     <div className="space-y-3">
       <div className="glass relative aspect-square overflow-hidden rounded-3xl">
-        <Image
-          src={images[active]}
-          alt={alt}
-          fill
-          priority
-          sizes="(max-width: 1024px) 100vw, 50vw"
-          className="object-cover"
-        />
+        <img src={images[active]} alt={alt} fetchPriority="high" className="absolute inset-0 h-full w-full object-cover" />
       </div>
       {images.length > 1 && (
         <div className="flex gap-3" role="tablist" aria-label="Product images">
@@ -30,7 +20,7 @@ export function ProductGallery({ images, alt }: { images: string[]; alt: string 
                 i === active ? "border-gold-400" : "border-transparent opacity-70 hover:opacity-100"
               }`}
             >
-              <Image src={src} alt="" fill sizes="80px" className="object-cover" />
+              <img src={src} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
             </button>
           ))}
         </div>

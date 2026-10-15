@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 
 const FADE_MS = 1200;
@@ -113,7 +111,6 @@ export function VideoBackdrop({ clips, className = "", videoClassName = "", desk
     <div ref={wrap} className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`} aria-hidden="true">
       {/* Poster: shown instantly, stays underneath as a fallback */}
       {showPoster && (
-        // eslint-disable-next-line @next/next/no-img-element
         <img src={`/videos/${clips[0]}.webp`} alt="" className={`absolute inset-0 h-full w-full object-cover ${videoClassName}`} decoding="async" />
       )}
       {enabled &&

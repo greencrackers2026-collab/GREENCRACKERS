@@ -15,16 +15,13 @@ export const formatDateTime = (d: Date | string) =>
     timeZone: "Asia/Kolkata",
   });
 
-export const parseJSON = <T>(s: string | null | undefined, fallback: T): T => {
-  if (!s) return fallback;
-  try {
-    return JSON.parse(s) as T;
-  } catch {
-    return fallback;
-  }
-};
-
 export const unitLabel = (unit: string) => (unit === "piece" ? "pc" : unit);
 
 export const waLink = (number: string, text: string) =>
   `https://wa.me/${number.replace(/\D/g, "")}?text=${encodeURIComponent(text)}`;
+
+export const splitList = (s: string) =>
+  s
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);

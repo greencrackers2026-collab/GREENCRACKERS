@@ -1,5 +1,4 @@
-import Image from "next/image";
-import Link from "next/link";
+import { Link } from "react-router";
 import type { ProductView } from "@/lib/catalog";
 import { categoryLabel } from "@/lib/constants";
 import { discountPercent, formatINR, unitLabel } from "@/lib/format";
@@ -15,8 +14,8 @@ export function toCartItem(p: ProductView) {
     price: p.price,
     mrp: p.mrp,
     unit: p.unit,
-    step: p.qtyStep,
-    min: p.minQty,
+    step: p.qty_step,
+    min: p.min_qty,
   };
 }
 
@@ -25,20 +24,19 @@ export function ProductCard({ p, priority = false }: { p: ProductView; priority?
   const out = p.stock <= 0;
   return (
     <article className="glass group relative flex flex-col overflow-hidden rounded-3xl transition duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_50px_-15px_rgba(255,160,60,0.45)]">
-      <Link href={`/products/${p.slug}`} className="relative block aspect-square overflow-hidden" tabIndex={-1} aria-hidden="true">
-        <Image
+      <Link to={`/products/${p.slug}`} className="relative block aspect-square overflow-hidden" tabIndex={-1} aria-hidden="true">
+        <img
           src={p.image}
           alt={`${p.brand} ${p.name}`}
-          fill
-          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
-          priority={priority}
+          loading={priority ? "eager" : "lazy"}
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
         <div className="absolute left-2 top-2 flex flex-col items-start gap-1.5">
           {off > 0 && <span className="badge bg-gradient-to-r from-gold-400 to-saffron-500 text-black shadow">{off}% OFF</span>}
-          {p.isBestSeller && <span className="badge bg-maroon-800/90 text-gold-300 ring-1 ring-gold-400/40">★ Best Seller</span>}
+          {p.is_best_seller && <span className="badge bg-maroon-800/90 text-gold-300 ring-1 ring-gold-400/40">★ Best Seller</span>}
         </div>
-        {p.isGreen && (
+        {p.is_green && (
           <span className="badge absolute right-2 top-2 bg-emerald-700 text-white" title="Green cracker">
             🌿 Green
           </span>
@@ -49,7 +47,7 @@ export function ProductCard({ p, priority = false }: { p: ProductView; priority?
           {p.brand} · {categoryLabel(p.category)}
         </p>
         <h3 className="line-clamp-2 text-sm font-semibold leading-snug sm:text-base">
-          <Link href={`/products/${p.slug}`} className="after:absolute after:inset-0 hover:text-gold-300 focus-visible:outline-none focus-visible:after:rounded-3xl focus-visible:after:ring-2 focus-visible:after:ring-gold-400">
+          <Link to={`/products/${p.slug}`} className="after:absolute after:inset-0 hover:text-gold-300 focus-visible:outline-none focus-visible:after:rounded-3xl focus-visible:after:ring-2 focus-visible:after:ring-gold-400">
             {p.name}
           </Link>
         </h3>

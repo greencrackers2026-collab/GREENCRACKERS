@@ -1,10 +1,7 @@
-"use client";
-
-import Image from "next/image";
-import Link from "next/link";
+import { Link } from "react-router";
 import { AnimatePresence, m } from "framer-motion";
 import { useEffect, useRef } from "react";
-import { cartMrp, cartSubtotal, useCart, useHydrated } from "./cart-store";
+import { cartMrp, cartSubtotal, useCart } from "./cart-store";
 import { QtyStepper } from "./QtyStepper";
 import { CloseIcon, TrashIcon } from "@/components/ui/Icons";
 import { formatINR, unitLabel } from "@/lib/format";
@@ -20,7 +17,6 @@ export function CartDrawer({
   freeDeliveryCode?: string | null;
 }) {
   const { items, isOpen, close, setQty, remove } = useCart();
-  const hydrated = useHydrated();
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,7 +37,7 @@ export function CartDrawer({
 
   return (
     <AnimatePresence>
-      {hydrated && isOpen && (
+      {isOpen && (
         <>
           <m.div
             className="fixed inset-0 z-[60] bg-black/60"
@@ -74,7 +70,7 @@ export function CartDrawer({
               <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
                 <p className="text-5xl" aria-hidden="true">🪔</p>
                 <p className="text-white/80">Your cart is empty. Let&apos;s light it up!</p>
-                <Link href="/products" className="btn btn-primary" onClick={close}>
+                <Link to="/products" className="btn btn-primary" onClick={close}>
                   Shop Crackers
                 </Link>
               </div>
@@ -86,31 +82,32 @@ export function CartDrawer({
                       🎉 FREE delivery with <b>{freeDeliveryCode}</b>, applied automatically at checkout
                     </p>
                   ) : (
-                  <div className="rounded-xl bg-white/5 px-3 py-2 text-sm">
-                    {toFree > 0 ? (
-                      <span>
-                        Add <b className="text-gold-400">{formatINR(toFree)}</b> more for <b>FREE delivery</b>
-                      </span>
-                    ) : (
-                      <span className="text-festive-green">You&apos;ve unlocked FREE delivery 🎉</span>
-                    )}
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-gold-400 to-saffron-500 transition-[width] duration-500"
-                        style={{ width: `${Math.min(100, (subtotal / freeShippingAbove) * 100)}%` }}
-                      />
+                    <div className="rounded-xl bg-white/5 px-3 py-2 text-sm">
+                      {toFree > 0 ? (
+                        <span>
+                          Add <b className="text-gold-400">{formatINR(toFree)}</b> more for <b>FREE delivery</b>
+                        </span>
+                      ) : (
+                        <span className="text-festive-green">You&apos;ve unlocked FREE delivery 🎉</span>
+                      )}
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-gold-400 to-saffron-500 transition-[width] duration-500"
+                          style={{ width: `${Math.min(100, (subtotal / freeShippingAbove) * 100)}%` }}
+                        />
+                      </div>
                     </div>
-                  </div>
                   )}
                 </div>
                 <ul className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
                   {items.map((i) => (
                     <li key={`${i.kind}-${i.id}`} className="glass flex gap-3 rounded-2xl p-3">
-                      <Image
+                      <img
                         src={i.image}
                         alt={i.name}
                         width={72}
                         height={72}
+                        loading="lazy"
                         className="h-[72px] w-[72px] shrink-0 rounded-xl object-cover"
                       />
                       <div className="min-w-0 flex-1">
@@ -154,7 +151,7 @@ export function CartDrawer({
                     <p className="text-xs text-saffron-400">Minimum order value is {formatINR(minOrderValue)}.</p>
                   )}
                   <Link
-                    href="/checkout"
+                    to="/checkout"
                     onClick={close}
                     className={`btn btn-primary w-full ${subtotal < minOrderValue ? "pointer-events-none opacity-50" : ""}`}
                     aria-disabled={subtotal < minOrderValue}

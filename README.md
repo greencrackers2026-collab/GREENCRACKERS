@@ -1,79 +1,106 @@
 ﻿# Diwali Crackers Store
 
-A fast, SEO-optimised Diwali crackers e-commerce site with a glassmorphism UI, a pre-Diwali offer system, checkout (Razorpay / UPI / COD), bulk quote requests and an admin dashboard.
+A fast Diwali crackers e-commerce site with a glassmorphism UI, a pre-Diwali offer system, checkout (UPI QR + screenshot, or Cash on Delivery), bulk quote requests and an admin dashboard.
 
-**Stack:** Next.js 15 (App Router) Â· TypeScript Â· Tailwind CSS 4 Â· Framer Motion Â· Prisma + SQLite (Postgres-ready) Â· Razorpay
+**Stack:** Vite · React 19 · TypeScript · Tailwind CSS 4 · Framer Motion · Supabase (Postgres, Auth, Storage) · hosted on Cloudflare Pages
 
-## Setup
+There is no separate backend. The React app talks to Supabase directly with the public anon key. The data is protected by **Row Level Security** and by SQL functions in `supabase/schema.sql`. Those functions re-price every cart in the database, so customers can't change prices from the browser.
+
+## 1. Set up Supabase
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. **SQL Editor:** paste and run `supabase/schema.sql`, then `supabase/seed.sql`. You can safely run both again later; the seed never overwrites your edits.
+3. **Authentication → Sign In / Providers:** turn off **Allow new users to sign up**. Only you need an account.
+4. **Authentication → Users → Add user:** create your admin login (email + password). Copy the user's **UID**.
+5. Back in the **SQL Editor**, make that user an admin:
+   ```sql
+   insert into public.admins (user_id) values ('PASTE-THE-UID-HERE');
+   ```
+6. **Project Settings → API:** copy the **Project URL** and the **anon public** key.
+
+> Never put the `service_role` / secret key in this app or in any `VITE_*` variable. Everything with that prefix ends up in the browser bundle.
+
+## 2. Run locally
 
 ```bash
 npm install
-cp .env.example .env        # then edit values (see below)
-npm run setup               # optimise images + create DB + seed products, offers, demo orders
-npm run dev                 # http://localhost:3000
+cp .env.example .env   # fill in VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY
+npm run dev            # http://localhost:5173
 ```
 
-Admin panel: `http://localhost:3000/admin`, using `ADMIN_USERNAME` / `ADMIN_PASSWORD` from `.env`.
+Admin panel: `http://localhost:5173/admin`. Sign in with the user from step 1.4.
 
-Production: `npm run build && npm start`.
+## 3. Deploy to Cloudflare Pages
 
-## Environment (`.env`)
+1. Push this repo to GitHub, then go to **Cloudflare dashboard → Workers & Pages → Create → Pages → Connect to Git**.
+2. Build settings:
+   - Framework preset: **None** (or Vite)
+   - Build command: `npm run build`
+   - Build output directory: `dist`
+3. **Environment variables** (Production and Preview):
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY`
+   - `VITE_SITE_URL`: your live domain, e.g. `https://greencrackers.in` (used for canonical URLs, the sitemap and Open Graph)
+   - `NODE_VERSION`: `22`
+4. Deploy. `public/_redirects` makes every route (e.g. `/products/...`, `/admin`) load the app, and `public/_headers` sets caching and security headers.
+5. Optional: in Supabase **Authentication → URL Configuration**, set the Site URL to your domain.
 
-| Variable | Purpose |
-|---|---|
-| `DATABASE_URL` | SQLite file by default (`file:./dev.db`) |
-| `NEXT_PUBLIC_SITE_URL` | Your public domain. Used for canonical URLs, sitemap and Open Graph. **Set this before going live.** |
-| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Admin login |
-| `ADMIN_SESSION_SECRET` | 32+ char random string that signs the admin cookie |
-| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Razorpay test/live keys. If left blank, the Razorpay option is hidden. |
-| `WHATSAPP_NUMBER`, `UPI_ID`, `DIWALI_DATE` | Seed defaults only; edit them later in **Admin â†’ Offers & Settings** |
+The build also writes `sitemap.xml` (including every visible product) and `robots.txt`. **Product changes in the admin appear on the site immediately**, but the sitemap only refreshes on the next deploy.
 
 ## Scripts
 
 | Script | What it does |
 |---|---|
-| `npm run images` | Converts the original photos in the project root into square WebP files in `public/products/`, plus the Small Fuljhadi placeholder, combo covers and `og-image.jpg` |
-| `npm run seed` | Loads products, combos, coupons, settings, demo orders and quotes. It is idempotent and never overwrites your edits. |
-| `npm run setup` | `images` + `prisma db push` + `seed` |
+| `npm run dev` | Local dev server |
+| `npm run build` | Typecheck, build to `dist/`, write sitemap + robots.txt |
+| `npm run preview` | Serve the production build locally |
 | `npm run lint` / `npm run typecheck` | Quality checks |
+| `npm run images` / `npm run videos` | Re-generate the optimised product photos / background videos in `public/` from the originals |
 
 ## What's editable from the admin (no code changes)
 
-- **Products:** name, brand, slug, price, MRP (with live % OFF), stock, images (upload), description, safety info, flags (visible / featured / best seller / green), min qty and qty step
-- **Offers & Settings:** hero title, rotating taglines, announcement bar, highlighted coupon, Diwali countdown date, extra-%-off-above-â‚¹X rule, shipping fee and free-shipping threshold, minimum order, COD/UPI toggles, UPI ID, WhatsApp, licence number, restriction banner (toggle + text), blocked/serviceable pincode prefixes, SEO cities
-- **Coupons:** code, % or flat, minimum order, max discount, expiry, pause/delete
+- **Products:** name, brand, slug, price, MRP (with live % OFF), your cost price (admin only), stock, images (upload), description, safety info, flags (visible / featured / best seller / green), min qty and qty step
+- **Offers & Settings:** hero title, rotating taglines, announcement bar, highlighted coupon (auto-applied at checkout), Diwali countdown date, extra-%-off-above-₹X rule, delivery fee and free-delivery threshold, COD charges, minimum order, COD/UPI toggles, UPI QR / UPI ID, licence number, restriction banner, blocked/serviceable pincode prefixes, SEO cities
+- **Coupons:** code, % / flat / free delivery, minimum order, max discount, expiry, pause/delete
 - **Combos:** name, tagline, extra discount %, visibility. Combo prices are computed from current product prices.
-- **Orders:** search and filter (status / payment / date), status pipeline (New â†’ Confirmed â†’ Packed â†’ Shipped â†’ Delivered / Cancelled), payment status, internal notes, printable invoice and packing slip, CSV export. Cancelling an order returns its stock.
+- **Orders:** search and filter, status pipeline (New → Confirmed → Packed → Shipped → Delivered / Cancelled), payment status, UPI screenshot review (approve / reject), internal notes, printable invoice and packing slip, CSV export. Cancelling an order returns its stock automatically.
 - **Quotes:** mark New / Contacted / Closed, reply on WhatsApp
 - **Customers:** list with order history and total spent
+- **Dashboard:** today / 7-day / total revenue and profit, profit by product, low stock
 
-## Notes for the owner âš ï¸
+## How it's secured
 
-- **Prices from ranges:** Coconut uses â‚¹450 (range 450â€“500), Sky Shot uses â‚¹650 (range 650â€“700), Murgachap uses â‚¹35 (range 35â€“40). Each one has an internal note in Admin â†’ Products.
-- **MRPs** are set so the discount is 60â€“68% off. Adjust them per product if your printed MRPs differ.
-- **Small Fuljhadi** uses a placeholder image. Upload a real photo in Admin â†’ Products â†’ Edit.
-- **Green badge:** it is set on products whose pack shows a green-fireworks mark in the photos (Nazi Green, Paanch Awathar, Anar, Big sparklers). Verify against your stock.
-- **Licence number:** add it in Admin â†’ Offers & Settings (shown in the footer and on invoices).
-- **Store details:** store name is "Green Crackers Limited" and WhatsApp/phone is 8920345119. Email, shop address, licence number and UPI ID are blank for now. Add them in settings when ready (the UPI payment option appears once a UPI ID is set).
-- **Delivery area:** no pincodes are blocked and the restriction notice is off; orders are accepted from everywhere and confirmed on WhatsApp. Both can be switched back on in Admin â†’ Offers & Settings.
-- **UPI payments** are verified manually: the customer submits their UTR on the order page, and you mark the order PAID after checking your bank app.
-- **Razorpay:** signatures are verified server-side. For extra reliability, also set up a Razorpay webhook (not included) before going live.
+| What | Who can do it |
+|---|---|
+| Read visible products, combos, settings | Everyone |
+| Get prices / place an order / attach a UPI screenshot | Everyone, but only through `price_cart()`, `place_order()` and `attach_payment_proof()`, which validate everything and compute prices, coupons and stock in the database |
+| Submit a quote | Everyone (insert only, validated by table constraints) |
+| Upload a payment screenshot | Everyone, as a new file with a random name in a **private** bucket. Customers can't list, read or overwrite screenshots. |
+| View an order | Anyone with its link (the id is a random UUID). Internal notes and cost prices are never included. |
+| Everything else (orders, customers, coupons, cost prices, product edits, settings) | Admins listed in `public.admins` only |
 
-## Deployment
+Other details:
+- Orders, quotes and UPI screenshot submissions are rate-limited per IP in the database (`request_log`).
+- Stock is decremented atomically when an order is placed, so two customers can't buy the last box.
+- Photos and payment screenshots are re-encoded in the browser before upload (resized, and EXIF/location data stripped).
 
-- Works on any Node host (VPS, Railway, Render, etc.). Uploaded images go to `./uploads` (set `UPLOAD_DIR` to change this), so use a host with a persistent disk.
-- The rate limiter is in-memory and only per instance. Use Redis if you run multiple instances.
+## Notes for the owner ⚠️
+
+- **Prices from ranges:** Coconut uses ₹450 (range 450–500), Sky Shot uses ₹650 (range 650–700), Murgachap uses ₹35 (range 35–40). Each one has an internal note in Admin → Products.
+- **Small Fuljhadi** uses a placeholder image. Upload a real photo in Admin → Products → Edit.
+- **Green badge:** it is set on products whose pack shows a green-fireworks mark in the photos. Verify against your stock.
+- **Licence number, email, shop address:** add them in Admin → Offers & Settings.
+- **UPI payments** are verified manually: the customer uploads a screenshot (and optionally the UTR), and you approve or reject it on the order page after checking your bank app.
 
 ## Project structure
 
 ```
-prisma/            schema.prisma, seed.ts
-scripts/           optimize-images.mjs
-public/products/   optimised product images (generated)
-src/app/(site)/    storefront: home, products, product detail, checkout, order, quote, info pages
-src/app/admin/     login, panel (dashboard, orders, quotes, products, offers, customers), print, server actions
-src/app/api/       pricing, orders, razorpay, quote, uploads, admin upload/export
-src/components/    cart, checkout, home, product, quote, site, admin, ui
-src/lib/           db, settings, catalog, pricing (server-side source of truth), orders, auth/session, seo, validation
-src/middleware.ts  admin route protection
+supabase/schema.sql   tables, RLS policies, pricing/order functions, storage buckets
+supabase/seed.sql     products, combos, coupons and settings
+public/               images, videos, _redirects + _headers for Cloudflare Pages
+scripts/              build-sitemap.mjs, optimize-images.mjs, encode-videos.mjs
+src/pages/site/       storefront: home, products, product detail, checkout, order, quote, info pages
+src/pages/admin/      login, dashboard, orders, quotes, products, offers & settings, customers, print
+src/components/       cart, checkout, home, product, quote, site, admin, ui
+src/lib/              supabase client, store (catalogue + settings), catalog, auth, images, profit, validation, seo
 ```

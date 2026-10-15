@@ -1,4 +1,3 @@
-import Image from "next/image";
 import type { ComboView } from "@/lib/catalog";
 import { discountPercent, formatINR } from "@/lib/format";
 import { AddToCartButton } from "@/components/cart/AddToCartButton";
@@ -8,17 +7,17 @@ export function ComboCard({ c }: { c: ComboView }) {
   return (
     <article className="glass glow-gold group flex flex-col overflow-hidden rounded-3xl transition duration-300 hover:-translate-y-1.5">
       <div className="relative aspect-[4/3] overflow-hidden">
-        <Image
+        <img
           src={c.image}
           alt={`${c.name}: crackers combo pack`}
-          fill
-          sizes="(max-width: 768px) 100vw, 33vw"
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent" />
         <div className="absolute left-3 top-3 flex gap-1.5">
           <span className="badge bg-gradient-to-r from-gold-400 to-saffron-500 text-black">{off}% OFF</span>
-          <span className="badge bg-fuchsia-600/90 text-white">COMBO +{c.extraDiscount}% extra</span>
+          <span className="badge bg-fuchsia-600/90 text-white">COMBO +{c.extra_discount}% extra</span>
         </div>
         <div className="absolute bottom-3 left-4 right-4">
           <h3 className="font-display text-2xl text-white drop-shadow">{c.name}</h3>

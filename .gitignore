@@ -1,14 +1,17 @@
 node_modules
-.next
-out
+dist
 .env
 .env.local
+*.local
 *.db
 *.db-journal
 /uploads/*
 !/uploads/.gitkeep
-next-env.d.ts
 *.tsbuildinfo
+
+# Leftovers from the old Next.js version
+.next
+next-env.d.ts
 
 # Raw source videos are large (some >100 MB); only the compressed files in public/videos are committed
 /*.mp4

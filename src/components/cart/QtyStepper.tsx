@@ -1,5 +1,3 @@
-"use client";
-
 import { MinusIcon, PlusIcon } from "@/components/ui/Icons";
 
 export function QtyStepper({

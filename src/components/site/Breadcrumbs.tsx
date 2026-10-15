@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "react-router";
 import { absoluteUrl } from "@/lib/seo";
 import { JsonLd } from "./JsonLd";
 
@@ -16,7 +16,7 @@ export function Breadcrumbs({ items }: { items: { name: string; href: string }[]
                   {c.name}
                 </span>
               ) : (
-                <Link href={c.href} className="hover:text-white">
+                <Link to={c.href} className="hover:text-white">
                   {c.name}
                 </Link>
               )}

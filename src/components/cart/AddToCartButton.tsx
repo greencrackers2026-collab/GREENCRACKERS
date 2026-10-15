@@ -1,5 +1,3 @@
-"use client";
-
 import { AnimatePresence, m } from "framer-motion";
 import { useState } from "react";
 import { useCart, type CartItem } from "./cart-store";

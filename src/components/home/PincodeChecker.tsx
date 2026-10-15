@@ -1,16 +1,9 @@
-"use client";
-
 import { useState } from "react";
 import { checkPincode, type PincodeResult } from "@/lib/pincode";
+import type { SiteSettings } from "@/lib/types";
 import { MapPinIcon } from "@/components/ui/Icons";
 
-export function PincodeChecker({
-  blockedPincodePrefixes,
-  serviceablePrefixes,
-}: {
-  blockedPincodePrefixes: string;
-  serviceablePrefixes: string;
-}) {
+export function PincodeChecker({ s }: { s: Pick<SiteSettings, "blocked_pincode_prefixes" | "serviceable_prefixes"> }) {
   const [pin, setPin] = useState("");
   const [res, setRes] = useState<PincodeResult | null>(null);
 
@@ -19,7 +12,7 @@ export function PincodeChecker({
       className="w-full"
       onSubmit={(e) => {
         e.preventDefault();
-        setRes(checkPincode(pin, { blockedPincodePrefixes, serviceablePrefixes }));
+        setRes(checkPincode(pin, s));
       }}
     >
       <label htmlFor="pincode-check" className="label flex items-center gap-1.5">
@@ -48,9 +41,7 @@ export function PincodeChecker({
           (res.ok ? (
             <span className="text-festive-green">✓ Great! We deliver to {pin}.</span>
           ) : (
-            <span className="text-saffron-400">
-              {res.reason}
-            </span>
+            <span className="text-saffron-400">{res.reason}</span>
           ))}
       </p>
     </form>

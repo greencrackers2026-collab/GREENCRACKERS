@@ -1,6 +1,5 @@
-"use client";
-
 import { useEffect, useState } from "react";
+import { uploadPaymentProof } from "@/lib/images";
 
 /** Uploads a UPI payment screenshot and reports the stored file name back to the parent. */
 export function PaymentProofUpload({ onUploaded, id = "payment-proof" }: { onUploaded: (name: string | null) => void; id?: string }) {
@@ -20,13 +19,8 @@ export function PaymentProofUpload({ onUploaded, id = "payment-proof" }: { onUpl
     onUploaded(null);
     setPreview(URL.createObjectURL(file));
     setBusy(true);
-    const fd = new FormData();
-    fd.append("file", file);
     try {
-      const res = await fetch("/api/payment-proof", { method: "POST", body: fd });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Upload failed. Please try again.");
-      onUploaded(data.proof);
+      onUploaded(await uploadPaymentProof(file));
       setDone(true);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Upload failed. Please try again.");
@@ -47,7 +41,6 @@ export function PaymentProofUpload({ onUploaded, id = "payment-proof" }: { onUpl
         }`}
       >
         {preview ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img src={preview} alt="Your payment screenshot" className="h-20 w-14 shrink-0 rounded-lg object-cover" />
         ) : (
           <span className="grid h-20 w-14 shrink-0 place-items-center rounded-lg bg-white/10 text-2xl" aria-hidden="true">
