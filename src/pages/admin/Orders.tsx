@@ -10,6 +10,7 @@ import { PageTitle, StatusBadge } from "@/components/admin/ui";
 import { ActionButton, AutoSaveSelect, LoadState } from "@/components/admin/FormBits";
 import { DeleteOrderButton } from "@/components/admin/DeleteOrderButton";
 import { TrashIcon } from "@/components/ui/Icons";
+import { WhatsAppConfirmButton } from "@/components/admin/WhatsAppConfirm";
 import { useAdminOutlet } from "./AdminLayout";
 
 const PER_PAGE = 25;
@@ -159,6 +160,10 @@ export function OrdersPage() {
                         {o.phone}
                       </a>
                       {o.email && <span className="block text-xs text-white/50">{o.email}</span>}
+                      <WhatsAppConfirmButton
+                        o={o}
+                        className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-[#25D366] px-2.5 py-1 text-xs font-semibold text-[#06290f]"
+                      />
                     </td>
                     <td className="max-w-56 p-3 text-white/75">
                       {o.delivery_mode === "PICKUP" && <span className="badge mb-1 bg-white/10">PICKUP</span>}
@@ -245,9 +250,12 @@ function OrderCard({ o, maps, onChanged }: { o: OrderWithItems; maps: CostMaps; 
             {o.delivery_mode === "PICKUP" ? "🏪 Pickup" : `${o.city}, ${o.pincode}`}
           </p>
         </div>
-        <a href={`tel:${o.phone}`} className="btn btn-ghost !min-h-9 shrink-0 !px-3 text-xs">
-          📞 {o.phone}
-        </a>
+        <div className="flex shrink-0 items-center gap-2">
+          <a href={`tel:${o.phone}`} className="btn btn-ghost !min-h-9 !px-3 text-xs">
+            📞 {o.phone}
+          </a>
+          <WhatsAppConfirmButton o={o} compact className="grid h-9 w-9 place-items-center rounded-full bg-[#25D366] text-[#06290f]" />
+        </div>
       </div>
 
       <ul className="mt-3 space-y-0.5 rounded-xl bg-white/5 p-2.5 text-sm text-white/80">

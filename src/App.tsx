@@ -10,6 +10,7 @@ import { ProductDetailPage } from "@/pages/site/ProductDetail";
 import { CheckoutPage } from "@/pages/site/Checkout";
 import { OrderPage } from "@/pages/site/Order";
 import { QuotePage } from "@/pages/site/Quote";
+import { TrackPage } from "@/pages/site/Track";
 import { AboutPage, ContactPage, PrivacyPage, SafetyPage, ShippingPage, TermsPage } from "@/pages/site/InfoPages";
 import { NotFound } from "@/pages/site/NotFound";
 
@@ -67,6 +68,7 @@ export function App() {
               <Route path="checkout" element={<CheckoutPage />} />
               <Route path="order/:id" element={<OrderPage />} />
               <Route path="quote" element={<QuotePage />} />
+              <Route path="track" element={<TrackPage />} />
               <Route path="about" element={<AboutPage />} />
               <Route path="contact" element={<ContactPage />} />
               <Route path="privacy" element={<PrivacyPage />} />

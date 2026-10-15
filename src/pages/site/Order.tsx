@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useStore } from "@/lib/store";
 import { useLoad } from "@/lib/useLoad";
+import { rememberOrder } from "@/lib/myOrders";
 import { formatDateTime, formatINR } from "@/lib/format";
 import { PAYMENT_METHOD_LABEL } from "@/lib/constants";
 import type { PublicOrder } from "@/lib/types";
@@ -41,6 +42,11 @@ export function OrderPage() {
       .then((QRCode) => QRCode.toDataURL(upiUri, { margin: 1, width: 240 }))
       .then(setQr, () => setQr(null));
   }, [showUpi, s.upi_id, s.upi_qr_image, upiUri]);
+
+  // Remember orders opened on this device (after checkout or from the WhatsApp link) for the Track Order page.
+  useEffect(() => {
+    if (order) rememberOrder({ id: order.id, order_number: order.order_number, total: order.total, created_at: order.created_at });
+  }, [order]);
 
   if (loading && !order) return <div className="mx-auto mt-10 h-96 max-w-3xl animate-pulse rounded-3xl bg-white/5 px-4" aria-busy="true" />;
   if (error)
@@ -190,6 +196,9 @@ export function OrderPage() {
       </section>
 
       <div className="mt-8 flex flex-wrap justify-center gap-3">
+        <Link to="/track" className="btn btn-ghost">
+          📦 All my orders
+        </Link>
         <Link to="/products" className="btn btn-ghost">
           Continue Shopping
         </Link>

@@ -13,6 +13,7 @@ const statics = [
   ["/", 1, "daily"],
   ["/products", 0.9, "daily"],
   ["/quote", 0.7, "weekly"],
+  ["/track", 0.5, "monthly"],
   ["/safety-tips", 0.5, "monthly"],
   ["/about", 0.4, "monthly"],
   ["/contact", 0.4, "monthly"],

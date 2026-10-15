@@ -4,12 +4,13 @@ import { markCodPaid, reviewPayment, updateOrder } from "@/lib/admin";
 import { supabase } from "@/lib/supabase";
 import { must, useLoad } from "@/lib/useLoad";
 import { ORDER_STATUSES, PAYMENT_METHOD_LABEL, PAYMENT_STATUSES } from "@/lib/constants";
-import { formatDateTime, formatINR, waLink } from "@/lib/format";
+import { formatDateTime, formatINR } from "@/lib/format";
 import { getCostMaps, itemUnitCost, orderProfit } from "@/lib/profit";
 import type { OrderWithItems } from "@/lib/types";
 import { PageTitle, StatusBadge } from "@/components/admin/ui";
 import { ActionButton, LoadState } from "@/components/admin/FormBits";
 import { DeleteOrderButton } from "@/components/admin/DeleteOrderButton";
+import { WhatsAppConfirmButton } from "@/components/admin/WhatsAppConfirm";
 import { NotFound } from "@/pages/site/NotFound";
 import { useAdminOutlet } from "./AdminLayout";
 
@@ -52,14 +53,7 @@ export function OrderDetail() {
         <Link to={`/admin/print/${o.id}?type=slip`} target="_blank" className="btn btn-ghost text-sm">
           📦 Packing slip
         </Link>
-        <a
-          href={waLink(`91${o.phone}`, `Hi ${o.name}, this is regarding your Diwali crackers order ${o.order_number}.`)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn bg-[#25D366] text-sm text-[#06290f]"
-        >
-          WhatsApp customer
-        </a>
+        <WhatsAppConfirmButton o={o} />
         <DeleteOrderButton
           order={o}
           onDeleted={() => {

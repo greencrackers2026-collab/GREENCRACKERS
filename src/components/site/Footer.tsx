@@ -41,6 +41,7 @@ export function Footer({ s }: { s: SiteSettings }) {
           <h2 className="font-semibold text-gold-300">Help</h2>
           <ul className="mt-3 space-y-2 text-sm text-white/75">
             {[
+              ["/track", "Track Your Order"],
               ["/quote", "Bulk / Wholesale Quote"],
               ["/safety-tips", "Safety Tips"],
               ["/shipping-returns", "Shipping & Returns"],

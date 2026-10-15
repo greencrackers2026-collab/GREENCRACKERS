@@ -609,6 +609,21 @@ language sql stable security definer set search_path = '' as $$
   where o.id = p_id;
 $$;
 
+-- Track Order page: finds an order only when both the order number and the checkout phone number match,
+-- so a phone number alone can't be used to look up someone's orders. Returns the order id (or null).
+create or replace function public.find_order(p_order_number text, p_phone text) returns uuid
+language plpgsql volatile security definer set search_path = '' as $$
+declare
+  v_phone text := regexp_replace(
+    regexp_replace(coalesce(p_phone, ''), '[\s-]', '', 'g'), '^(\+91|91|0)(?=[6-9][0-9]{9}$)', '');
+  v_id    uuid;
+begin
+  perform public._rate_limit('track', 20, interval '10 minutes');
+  select id into v_id from public.orders
+   where order_number = upper(btrim(coalesce(p_order_number, ''))) and phone = v_phone;
+  return v_id;
+end $$;
+
 -- Customer attaches (or replaces) the UPI payment screenshot for an order; the admin then verifies it.
 create or replace function public.attach_payment_proof(p_order_id uuid, p_proof text, p_upi_ref text default null)
 returns void
@@ -780,6 +795,7 @@ grant execute on function public.site_settings() to anon, authenticated;
 grant execute on function public.price_cart(jsonb, text, text, text) to anon, authenticated;
 grant execute on function public.place_order(jsonb) to anon, authenticated;
 grant execute on function public.get_order(uuid) to anon, authenticated;
+grant execute on function public.find_order(text, text) to anon, authenticated;
 grant execute on function public.attach_payment_proof(uuid, text, text) to anon, authenticated;
 
 -- ───────────────────────────── Storage ─────────────────────────────
