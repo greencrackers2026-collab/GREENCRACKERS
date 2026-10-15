@@ -22,7 +22,6 @@ const TESTIMONIALS = [
 
 export function HomePage() {
   const { settings: s, products, combos } = useStore();
-  const featured = products.filter((p) => p.is_featured).slice(0, 8);
   const bestSellers = products.filter((p) => p.is_best_seller);
   const faqs = getFaqs(s);
   const heroImgs = [products.find((p) => p.slug.includes("paanch")), products.find((p) => p.slug.includes("sky-shot")), products.find((p) => p.slug.includes("coconut"))].filter(Boolean);
@@ -129,20 +128,25 @@ export function HomePage() {
         </ul>
       </section>
 
-      {/* ALL CRACKERS (mobile): the full catalogue on the front page */}
-      <section className="mx-auto mt-10 max-w-7xl px-4 md:hidden" aria-labelledby="all-title">
-        <h2 id="all-title" className="text-2xl font-bold">
-          All <span className="text-gradient">Crackers</span>
-        </h2>
+      {/* ALL CRACKERS: the full catalogue on the front page, grouped by category (Sound first) */}
+      <section className="mx-auto mt-10 max-w-7xl px-4 sm:mt-16" aria-labelledby="all-title">
+        <div className="flex items-end justify-between gap-4">
+          <h2 id="all-title" className="text-2xl font-bold sm:text-3xl">
+            All <span className="text-gradient">Crackers</span>
+          </h2>
+          <Link to="/products" className="text-sm font-semibold text-gold-300 hover:underline">
+            Search &amp; filter →
+          </Link>
+        </div>
         {CATEGORIES.map((c) => {
           const items = products.filter((p) => p.category === c.key);
           if (items.length === 0) return null;
           return (
-            <div key={c.key} className="mt-6">
-              <h3 className="text-lg font-semibold text-gold-300">
+            <div key={c.key} id={`cat-${c.key.toLowerCase()}`} className="mt-6 scroll-mt-28 sm:mt-10">
+              <h3 className="text-lg font-semibold text-gold-300 sm:text-xl">
                 <span aria-hidden="true">{c.emoji}</span> {c.label}
               </h3>
-              <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
                 {items.map((p) => (
                   <ProductCard key={p.id} p={p} />
                 ))}
@@ -150,23 +154,6 @@ export function HomePage() {
             </div>
           );
         })}
-      </section>
-
-      {/* FEATURED */}
-      <section className="mx-auto mt-16 hidden md:block max-w-7xl px-4" aria-labelledby="featured-title">
-        <div className="flex items-end justify-between gap-4">
-          <h2 id="featured-title" className="text-2xl font-bold sm:text-3xl">
-            Pre-Diwali <span className="text-gradient">Hot Deals</span>
-          </h2>
-          <Link to="/products" className="text-sm font-semibold text-gold-300 hover:underline">
-            View all →
-          </Link>
-        </div>
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
-          {featured.map((p) => (
-            <ProductCard key={p.id} p={p} />
-          ))}
-        </div>
       </section>
 
       {/* COMBOS */}
