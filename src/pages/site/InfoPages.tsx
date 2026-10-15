@@ -2,6 +2,17 @@ import { Link } from "react-router";
 import { useStore } from "@/lib/store";
 import { formatINR } from "@/lib/format";
 import { InfoPage } from "@/components/site/InfoPage";
+import type { SiteSettings } from "@/lib/types";
+
+/** " on <phone> or at <email>", using whichever contact details are set in Admin → Offers & Settings. */
+function ReachUs({ s }: { s: SiteSettings }) {
+  const phone = s.phone && <a href={`tel:${s.phone.replace(/s/g, "")}`}>{s.phone}</a>;
+  const email = s.email && <a href={`mailto:${s.email}`}>{s.email}</a>;
+  if (phone && email) return <> on {phone} or at {email}</>;
+  if (phone) return <> on {phone}</>;
+  if (email) return <> at {email}</>;
+  return null;
+}
 
 export function AboutPage() {
   const { settings: s } = useStore();
@@ -38,7 +49,7 @@ export function ContactPage() {
   return (
     <InfoPage
       title="Contact Us"
-      description={`Contact ${s.store_name} for Diwali crackers orders, bulk quotes and delivery questions. Call us.`}
+      description={`Contact ${s.store_name} for Diwali crackers orders, bulk quotes and delivery questions.${s.phone ? ` Call ${s.phone}.` : ""}${s.email ? ` Email ${s.email}.` : ""}`}
       path="/contact"
       intro="We're happy to help with orders, delivery and bulk pricing."
     >
@@ -61,7 +72,7 @@ export function ContactPage() {
       </p>
       <h2>Pickup from shop</h2>
       <p>
-        If delivery isn&apos;t available in your area, choose &quot;Pickup from shop&quot; at checkout or call us.
+        If delivery isn&apos;t available in your area, choose &quot;Pickup from shop&quot; at checkout or contact us<ReachUs s={s} />.
       </p>
     </InfoPage>
   );
@@ -157,7 +168,10 @@ export function ShippingPage() {
         <li>Pickup from our licensed shop is available. Choose it at checkout.</li>
       </ul>
       <h2>Cancellations</h2>
-      <p>You can cancel an order before it is packed. Contact us by phone with your order ID. Prepaid orders are refunded to the original payment method within 5 to 7 working days.</p>
+      <p>
+        You can cancel an order before it is packed. Contact us<ReachUs s={s} /> with
+        your order ID. Prepaid orders are refunded to the original payment method within 5 to 7 working days.
+      </p>
       <h2>Returns</h2>
       <p>
         For safety reasons crackers cannot be returned once delivered. If an item arrives damaged or is missing, share photos with us

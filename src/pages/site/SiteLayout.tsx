@@ -17,8 +17,14 @@ export function SiteLayout() {
     name: s.store_name,
     url: SITE_URL,
     logo: absoluteUrl("/icon.svg"),
-    ...(s.phone && {
-      contactPoint: { "@type": "ContactPoint", telephone: s.phone, contactType: "customer service", areaServed: "IN" },
+    ...((s.phone || s.email) && {
+      contactPoint: {
+        "@type": "ContactPoint",
+        ...(s.phone && { telephone: s.phone }),
+        ...(s.email && { email: s.email }),
+        contactType: "customer service",
+        areaServed: "IN",
+      },
     }),
     ...(s.address && { address: { "@type": "PostalAddress", streetAddress: s.address, addressCountry: "IN" } }),
   };
