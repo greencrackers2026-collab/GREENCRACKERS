@@ -101,6 +101,8 @@ export type Settings = {
   referral_min_order: number;
   referral_reward_max: number;
   referral_friend_cashback_max: number;
+  referral_require_purchase: boolean;
+  referral_cashback_on_diwali: boolean;
   updated_at: string;
 };
 

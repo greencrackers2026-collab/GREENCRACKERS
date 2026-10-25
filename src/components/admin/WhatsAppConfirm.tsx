@@ -1,11 +1,13 @@
 import { useStore } from "@/lib/store";
 import { absoluteUrl } from "@/lib/seo";
 import { formatINR, waLink } from "@/lib/format";
-import type { OrderWithItems } from "@/lib/types";
+import { cashbackWhen } from "@/lib/referral";
+import type { OrderWithItems, SiteSettings } from "@/lib/types";
 import { WhatsAppIcon } from "@/components/ui/Icons";
 
 /** Order confirmation text, ready to send to the customer on WhatsApp. */
-export function confirmationMessage(o: OrderWithItems, storeName: string) {
+export function confirmationMessage(o: OrderWithItems, s: Pick<SiteSettings, "store_name" | "diwali_date" | "referral_cashback_on_diwali">) {
+  const storeName = s.store_name;
   const payment =
     o.payment_method === "COD"
       ? o.payment_status === "PAID"
@@ -30,7 +32,7 @@ export function confirmationMessage(o: OrderWithItems, storeName: string) {
     `Delivery: ${o.shipping_fee ? formatINR(o.shipping_fee) : "FREE"}`,
     ...(o.cod_fee ? [`COD charges: ${formatINR(o.cod_fee)}`] : []),
     `*Total: ${formatINR(o.total)}*`,
-    ...(o.referral_code ? [`🎁 Referral code ${o.referral_code}: FREE delivery + no COD charges. Your cashback comes after delivery.`] : []),
+    ...(o.referral_code ? [`🎁 Referral code ${o.referral_code}: FREE delivery + no COD charges. Your cashback comes ${cashbackWhen(s)}.`] : []),
     "",
     `*Payment:* ${payment}`,
     `*${o.delivery_mode === "PICKUP" ? "Pickup" : "Delivery to"}:* ${delivery}`,
@@ -46,7 +48,7 @@ export function WhatsAppConfirmButton({ o, className, compact = false }: { o: Or
   const { settings } = useStore();
   return (
     <a
-      href={waLink(`91${o.phone}`, confirmationMessage(o, settings.store_name))}
+      href={waLink(`91${o.phone}`, confirmationMessage(o, settings))}
       target="_blank"
       rel="noopener noreferrer"
       className={className ?? "btn bg-[#25D366] text-sm text-[#06290f]"}

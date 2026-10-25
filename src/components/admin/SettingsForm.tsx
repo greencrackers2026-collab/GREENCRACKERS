@@ -97,6 +97,8 @@ export function SettingsForm({ v, onSaved }: { v: Settings; onSaved: () => Promi
         referral_min_order: Math.max(0, int("referral_min_order")),
         referral_reward_max: Math.max(0, int("referral_reward_max")),
         referral_friend_cashback_max: Math.max(0, int("referral_friend_cashback_max")),
+        referral_require_purchase: bool("referral_require_purchase"),
+        referral_cashback_on_diwali: bool("referral_cashback_on_diwali"),
       })
       .eq("id", 1);
     setPending(false);
@@ -159,8 +161,18 @@ export function SettingsForm({ v, onSaved }: { v: Settings; onSaved: () => Promi
 
       <section className={section}>
         <h2 className={h}>Refer &amp; earn</h2>
-        <div className="sm:col-span-2">
+        <div className="space-y-3 sm:col-span-2">
           <Check name="referral_enabled" label="Referral codes work at checkout" def={v.referral_enabled} />
+          <Check
+            name="referral_require_purchase"
+            label="Customer must order first: new codes start locked until you tap Activate"
+            def={v.referral_require_purchase}
+          />
+          <Check
+            name="referral_cashback_on_diwali"
+            label="All cashback is paid on Diwali day (used in WhatsApp messages and checkout)"
+            def={v.referral_cashback_on_diwali}
+          />
         </div>
         <Field label="Minimum order for a referral (₹)" hint="Friend's sale-price total must be at least this">
           <input name="referral_min_order" type="number" min={0} className="input" defaultValue={v.referral_min_order} />

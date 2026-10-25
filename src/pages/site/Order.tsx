@@ -5,6 +5,7 @@ import { useStore } from "@/lib/store";
 import { useLoad } from "@/lib/useLoad";
 import { rememberOrder } from "@/lib/myOrders";
 import { formatDateTime, formatINR } from "@/lib/format";
+import { cashbackWhen } from "@/lib/referral";
 import { PAYMENT_METHOD_LABEL } from "@/lib/constants";
 import type { PublicOrder } from "@/lib/types";
 import { UpiRefForm } from "@/components/checkout/UpiRefForm";
@@ -170,7 +171,7 @@ export function OrderPage() {
                 ? ""
                 : order.friend_cashback_paid && order.friend_cashback > 0
                   ? `${formatINR(order.friend_cashback)} cashback sent to you ✓`
-                  : `Up to ${formatINR(s.referral_friend_cashback_max)} cashback after delivery.`}
+                  : `Up to ${formatINR(s.referral_friend_cashback_max)} cashback ${cashbackWhen(s)}.`}
             </div>
           )}
           {order.cod_fee > 0 && (

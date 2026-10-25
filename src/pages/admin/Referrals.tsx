@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { useStore } from "@/lib/store";
 import { must, useLoad } from "@/lib/useLoad";
 import { formatDateTime, formatINR, waLink } from "@/lib/format";
-import { referralInviteMessage, suggestReferralCode } from "@/lib/referral";
+import { cashbackWhen, referralInviteMessage, suggestReferralCode } from "@/lib/referral";
 import type { Customer, Order, ReferralCode } from "@/lib/types";
 import { PageTitle, StatCard, StatusBadge } from "@/components/admin/ui";
 import { ActionButton, LoadState } from "@/components/admin/FormBits";
@@ -16,7 +16,7 @@ type ReferredOrder = Pick<
 >;
 
 async function loadReferrals() {
-  const [codes, orders, customers] = await Promise.all([
+  const [codes, orders, customers, paid] = await Promise.all([
     supabase.from("referral_codes").select("*").order("created_at", { ascending: false }),
     supabase
       .from("orders")
@@ -24,11 +24,14 @@ async function loadReferrals() {
       .not("referral_code", "is", null)
       .order("created_at", { ascending: false }),
     supabase.from("customers").select("name, phone").order("updated_at", { ascending: false }).limit(1000),
+    // Customers who have ordered themselves; helps decide when to activate their code.
+    supabase.from("orders").select("phone").neq("status", "CANCELLED"),
   ]);
   return {
     codes: must(codes) as ReferralCode[],
     orders: must(orders) as ReferredOrder[],
     customers: must(customers) as Pick<Customer, "name" | "phone">[],
+    buyers: new Set((must(paid) as { phone: string }[]).map((o) => o.phone)),
   };
 }
 
@@ -67,10 +70,13 @@ export function ReferralsPage() {
         <p className="mb-4 text-sm text-white/55">
           Friends who use the code on an order of {formatINR(settings.referral_min_order)}+ get FREE delivery + no COD charges + up to{" "}
           {formatINR(settings.referral_friend_cashback_max)} cashback. The customer earns up to {formatINR(settings.referral_reward_max)} per order.
+          {settings.referral_require_purchase && " New codes start locked: tap Activate once the customer has placed their own order."}
+          {settings.referral_cashback_on_diwali && ` All cashback is paid ${cashbackWhen(settings)}.`}
         </p>
         <ReferralForm
           customers={data.customers}
           codes={data.codes}
+          buyers={data.buyers}
           defaultExpiry={istDate(settings.diwali_date)}
           onSaved={reload}
         />
@@ -85,7 +91,7 @@ export function ReferralsPage() {
         ) : (
           <div className="space-y-3">
             {data.codes.map((r) => (
-              <CodeCard key={r.id} r={r} orders={data.orders.filter((o) => o.referral_code === r.code)} onSaved={reload} />
+              <CodeCard key={r.id} r={r} hasOrdered={data.buyers.has(r.referrer_phone)} orders={data.orders.filter((o) => o.referral_code === r.code)} onSaved={reload} />
             ))}
           </div>
         )}
@@ -97,11 +103,13 @@ export function ReferralsPage() {
 function ReferralForm({
   customers,
   codes,
+  buyers,
   defaultExpiry,
   onSaved,
 }: {
   customers: Pick<Customer, "name" | "phone">[];
   codes: ReferralCode[];
+  buyers: Set<string>;
   defaultExpiry: string;
   onSaved: () => void;
 }) {
@@ -134,7 +142,13 @@ function ReferralForm({
     setPending(true);
     const { data, error } = await supabase
       .from("referral_codes")
-      .insert({ code: c, referrer_name: name.trim(), referrer_phone: phone, expires_at: expiry ? `${expiry}T23:59:59+05:30` : null })
+      .insert({
+        code: c,
+        referrer_name: name.trim(),
+        referrer_phone: phone,
+        expires_at: expiry ? `${expiry}T23:59:59+05:30` : null,
+        active: !settings.referral_require_purchase,
+      })
       .select()
       .single();
     setPending(false);
@@ -186,6 +200,10 @@ function ReferralForm({
         <div className="col-span-2 flex flex-wrap items-center gap-3 rounded-xl bg-emerald-500/15 p-3 text-sm lg:col-span-5" role="status">
           <span>
             ✓ Code <b className="font-mono">{state.created.code}</b> created for {state.created.referrer_name}.
+            {!state.created.active &&
+              (buyers.has(state.created.referrer_phone)
+                ? " They have already ordered, so you can activate it below."
+                : " It stays locked until they order and you tap Activate.")}
           </span>
           <a
             href={waLink(`91${state.created.referrer_phone}`, referralInviteMessage(state.created, settings))}
@@ -201,7 +219,7 @@ function ReferralForm({
   );
 }
 
-function CodeCard({ r, orders, onSaved }: { r: ReferralCode; orders: ReferredOrder[]; onSaved: () => void }) {
+function CodeCard({ r, hasOrdered, orders, onSaved }: { r: ReferralCode; hasOrdered: boolean; orders: ReferredOrder[]; onSaved: () => void }) {
   const { settings } = useStore();
   const expired = Boolean(r.expires_at && new Date(r.expires_at) < new Date());
   const live = orders.filter((o) => o.status !== "CANCELLED");
@@ -218,6 +236,9 @@ function CodeCard({ r, orders, onSaved }: { r: ReferralCode; orders: ReferredOrd
             {r.referrer_phone}
           </a>
         </span>
+        <span className={`badge ${hasOrdered ? "bg-emerald-500/20 text-emerald-200" : "bg-white/10 text-white/60"}`}>
+          {hasOrdered ? "✓ Has ordered" : "No order yet"}
+        </span>
         <span className={`text-sm ${expired ? "text-red-300" : "text-white/60"}`}>{r.expires_at ? `Till ${formatDateTime(r.expires_at)}` : "No expiry"}</span>
         <span className="text-sm">
           {live.length} order{live.length === 1 ? "" : "s"}
@@ -231,20 +252,38 @@ function CodeCard({ r, orders, onSaved }: { r: ReferralCode; orders: ReferredOrd
             rel="noopener noreferrer"
             className="grid h-10 w-10 place-items-center rounded-full bg-[#25D366] text-[#06290f]"
             aria-label={`Send code ${r.code} to ${r.referrer_name} on WhatsApp`}
-            title="Send code on WhatsApp"
+            title={r.active ? "Send “code is active” message on WhatsApp" : "Send code + offer details on WhatsApp"}
             onClick={(e) => e.stopPropagation()}
           >
             <WhatsAppIcon width={18} height={18} />
           </a>
-          <ActionButton
-            className={`badge cursor-pointer ${r.active && !expired ? "bg-emerald-700 text-white" : "bg-white/15"}`}
-            onClick={async () => {
-              must(await supabase.from("referral_codes").update({ active: !r.active }).eq("id", r.id));
-              onSaved();
-            }}
-          >
-            {expired ? "Expired" : r.active ? "Active" : "Paused"}
-          </ActionButton>
+          {r.active || expired ? (
+            <ActionButton
+              className={`badge cursor-pointer ${r.active && !expired ? "bg-emerald-700 text-white" : "bg-white/15"}`}
+              confirm={expired ? undefined : `Lock code ${r.code} again? Friends won't be able to use it.`}
+              onClick={async () => {
+                must(await supabase.from("referral_codes").update({ active: !r.active }).eq("id", r.id));
+                onSaved();
+              }}
+            >
+              {expired ? "Expired" : "✓ Active"}
+            </ActionButton>
+          ) : (
+            <ActionButton
+              className="btn btn-primary !min-h-10 px-4 text-sm"
+              confirm={
+                hasOrdered
+                  ? `Activate code ${r.code}? Then tap the WhatsApp button to tell ${r.referrer_name} it's active.`
+                  : `${r.referrer_name} has no order yet. Activate code ${r.code} anyway?`
+              }
+              onClick={async () => {
+                must(await supabase.from("referral_codes").update({ active: true }).eq("id", r.id));
+                onSaved();
+              }}
+            >
+              🔓 Activate
+            </ActionButton>
+          )}
         </span>
       </summary>
       <div className="border-t border-white/10 p-4 text-sm">
@@ -269,7 +308,10 @@ function CodeCard({ r, orders, onSaved }: { r: ReferralCode; orders: ReferredOrd
           </ul>
         )}
         <div className="mt-3 flex items-center justify-between gap-3 text-xs text-white/50">
-          <span>Created {formatDateTime(r.created_at)} · Set cashback on each order&apos;s page.</span>
+          <span>
+            Created {formatDateTime(r.created_at)} · Set cashback on each order&apos;s page.{" "}
+            {!r.active && !expired && "Locked: send the offer message now, then activate after their order and send it again."}
+          </span>
           <ActionButton
             className="text-xs text-red-300 hover:underline"
             confirm={`Delete referral code ${r.code}? Past orders keep the code, but it stops working at checkout.`}

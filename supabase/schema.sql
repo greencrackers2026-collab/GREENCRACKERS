@@ -260,6 +260,10 @@ alter table public.settings add column if not exists referral_enabled           
 alter table public.settings add column if not exists referral_min_order           int not null default 1999 check (referral_min_order >= 0);
 alter table public.settings add column if not exists referral_reward_max          int not null default 1000 check (referral_reward_max >= 0);
 alter table public.settings add column if not exists referral_friend_cashback_max int not null default 100 check (referral_friend_cashback_max >= 0);
+-- New codes start inactive; the admin activates each one by hand after the customer's own first order.
+alter table public.settings add column if not exists referral_require_purchase    boolean not null default true;
+-- All cashback is paid out on Diwali day (changes the wording shown to customers).
+alter table public.settings add column if not exists referral_cashback_on_diwali  boolean not null default true;
 
 -- ───────────────────────────── updated_at triggers ─────────────────────────────
 
@@ -457,8 +461,10 @@ begin
       select * into rf from public.referral_codes where code = v_code;
     end if;
     if rf.id is not null then
-      if not s.referral_enabled or not rf.active then
-        v_coupon_message := 'This referral code is not active.';
+      if not s.referral_enabled then
+        v_coupon_message := 'Referral codes are not available right now.';
+      elsif not rf.active then
+        v_coupon_message := 'This referral code is not active yet. Ask your friend to place their own first order to activate it.';
       elsif rf.expires_at is not null and rf.expires_at < now() then
         v_coupon_message := 'This referral code has expired.';
       elsif v_subtotal < s.referral_min_order then
@@ -467,8 +473,9 @@ begin
       else
         v_referral := true;
         v_coupon_code := rf.code;
-        v_coupon_message := format('Referral code %s applied: FREE delivery, no COD charges and up to ₹%s cashback after delivery.',
-                                   rf.code, s.referral_friend_cashback_max);
+        v_coupon_message := format('Referral code %s applied: FREE delivery, no COD charges and up to ₹%s cashback %s.',
+                                   rf.code, s.referral_friend_cashback_max,
+                                   case when s.referral_cashback_on_diwali then 'on Diwali day' else 'after delivery' end);
       end if;
     elsif cp.id is null or not cp.active then
       v_coupon_message := 'Invalid coupon code.';

@@ -6,7 +6,7 @@ import { must, useLoad } from "@/lib/useLoad";
 import { ORDER_STATUSES, PAYMENT_METHOD_LABEL, PAYMENT_STATUSES } from "@/lib/constants";
 import { formatDateTime, formatINR, waLink } from "@/lib/format";
 import { getCostMaps, itemUnitCost, orderProfit } from "@/lib/profit";
-import { friendCashbackMessage, referrerCashbackMessage } from "@/lib/referral";
+import { cashbackWhen, friendCashbackMessage, referrerCashbackMessage } from "@/lib/referral";
 import { useStore } from "@/lib/store";
 import type { OrderWithItems, ReferralCode } from "@/lib/types";
 import { PageTitle, StatusBadge } from "@/components/admin/ui";
@@ -365,7 +365,7 @@ function ReferralCashback({ o, referrer, onSaved }: { o: OrderWithItems; referre
         ) : (
           " (code was deleted)"
         )}
-        . Pay cashback once the order is delivered.
+        . Pay cashback {cashbackWhen(settings)}.
       </p>
       {o.status === "CANCELLED" && <p className="mt-2 text-red-300">Order cancelled: no cashback is due.</p>}
       <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
@@ -379,9 +379,9 @@ function ReferralCashback({ o, referrer, onSaved }: { o: OrderWithItems; referre
             <label className="mt-2 flex items-center gap-2">
               <input type="checkbox" checked={refPaid} onChange={(e) => setRefPaid(e.target.checked)} className="h-5 w-5 accent-amber-400" /> Paid to {referrer.referrer_name}
             </label>
-            {o.referrer_cashback > 0 && o.referrer_cashback_paid && (
-              <a href={waLink(`91${referrer.referrer_phone}`, referrerCashbackMessage(referrer, o, settings.store_name))} target="_blank" rel="noopener noreferrer" className={`${waBtn} mt-3 w-full`}>
-                <WhatsAppIcon width={18} height={18} /> Tell {referrer.referrer_name}
+            {o.referrer_cashback > 0 && (
+              <a href={waLink(`91${referrer.referrer_phone}`, referrerCashbackMessage(referrer, o, settings))} target="_blank" rel="noopener noreferrer" className={`${waBtn} mt-3 w-full`}>
+                <WhatsAppIcon width={18} height={18} /> {o.referrer_cashback_paid ? "Tell: cashback sent" : "Tell: cashback earned"}
               </a>
             )}
           </fieldset>
@@ -395,9 +395,9 @@ function ReferralCashback({ o, referrer, onSaved }: { o: OrderWithItems; referre
           <label className="mt-2 flex items-center gap-2">
             <input type="checkbox" checked={friendPaid} onChange={(e) => setFriendPaid(e.target.checked)} className="h-5 w-5 accent-amber-400" /> Paid to {o.name}
           </label>
-          {o.friend_cashback > 0 && o.friend_cashback_paid && (
-            <a href={waLink(`91${o.phone}`, friendCashbackMessage(o, settings.store_name))} target="_blank" rel="noopener noreferrer" className={`${waBtn} mt-3 w-full`}>
-              <WhatsAppIcon width={18} height={18} /> Tell {o.name}
+          {o.friend_cashback > 0 && (
+            <a href={waLink(`91${o.phone}`, friendCashbackMessage(o, settings))} target="_blank" rel="noopener noreferrer" className={`${waBtn} mt-3 w-full`}>
+              <WhatsAppIcon width={18} height={18} /> {o.friend_cashback_paid ? "Tell: cashback sent" : "Tell: cashback earned"}
             </a>
           )}
         </fieldset>
@@ -416,7 +416,10 @@ function ReferralCashback({ o, referrer, onSaved }: { o: OrderWithItems; referre
       >
         Save cashback
       </ActionButton>
-      <p className="mt-2 text-xs text-white/50">Send the cashback by UPI to their mobile number, tick “Paid”, save, then tap the WhatsApp button to let them know.</p>
+      <p className="mt-2 text-xs text-white/50">
+        Save the amounts and send “cashback earned” on WhatsApp. {settings.referral_cashback_on_diwali ? "On Diwali day" : "After delivery"}, pay by UPI, tick
+        “Paid”, save, and send “cashback sent”.
+      </p>
     </section>
   );
 }
