@@ -5,7 +5,7 @@ import { supabase } from "./supabase";
  *
  * Revenue  = subtotal − coupon − auto discount   (delivery fee excluded; treated as pass-through to the courier)
  * Cost     = Σ unitCost × qty                   (cost snapshot saved on the order; if missing, the product's current cost)
- * Profit   = Revenue − Cost
+ * Profit   = Revenue − Cost − referral cashback
  */
 
 export type CostMaps = { product: Map<string, number>; combo: Map<string, number> };
@@ -33,7 +33,14 @@ export async function getCostMaps(): Promise<CostMaps> {
 }
 
 type ItemLike = { kind: string; ref_id: string; unit_cost: number; qty: number; line_total: number };
-type OrderLike = { subtotal: number; coupon_discount: number; auto_discount: number; order_items: ItemLike[] };
+type OrderLike = {
+  subtotal: number;
+  coupon_discount: number;
+  auto_discount: number;
+  referrer_cashback?: number;
+  friend_cashback?: number;
+  order_items: ItemLike[];
+};
 
 export const itemUnitCost = (i: ItemLike, maps: CostMaps) =>
   i.unit_cost || (i.kind === "COMBO" ? maps.combo.get(i.ref_id) : maps.product.get(i.ref_id)) || 0;
@@ -47,8 +54,9 @@ export function orderProfit(o: OrderLike, maps: CostMaps) {
     cost += u * i.qty;
   }
   const revenue = o.subtotal - o.coupon_discount - o.auto_discount;
-  const profit = revenue - cost;
-  return { revenue, cost, profit, margin: revenue > 0 ? (profit / revenue) * 100 : 0, missing };
+  const cashback = (o.referrer_cashback ?? 0) + (o.friend_cashback ?? 0);
+  const profit = revenue - cost - cashback;
+  return { revenue, cost, cashback, profit, margin: revenue > 0 ? (profit / revenue) * 100 : 0, missing };
 }
 
 export function sumProfit(orders: OrderLike[], maps: CostMaps) {

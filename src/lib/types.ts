@@ -55,6 +55,17 @@ export type Coupon = {
   created_at: string;
 };
 
+export type ReferralCode = {
+  id: string;
+  code: string;
+  referrer_name: string;
+  referrer_phone: string;
+  active: boolean;
+  expires_at: string | null;
+  usage_count: number;
+  created_at: string;
+};
+
 export type Settings = {
   id: number;
   store_name: string;
@@ -86,6 +97,10 @@ export type Settings = {
   blocked_pincode_prefixes: string;
   serviceable_prefixes: string;
   seo_cities: string;
+  referral_enabled: boolean;
+  referral_min_order: number;
+  referral_reward_max: number;
+  referral_friend_cashback_max: number;
   updated_at: string;
 };
 
@@ -124,6 +139,9 @@ export type PriceQuote = {
   cod_fee: number;
   total: number;
   savings: number;
+  /** True when coupon_code is a referral code (delivery + COD charges waived). */
+  referral: boolean;
+  referral_waiver: number;
   meets_minimum: boolean;
 };
 
@@ -144,6 +162,11 @@ export type Order = {
   subtotal: number;
   mrp_total: number;
   coupon_code: string | null;
+  referral_code: string | null;
+  referrer_cashback: number;
+  friend_cashback: number;
+  referrer_cashback_paid: boolean;
+  friend_cashback_paid: boolean;
   coupon_discount: number;
   auto_discount: number;
   shipping_fee: number;
@@ -177,7 +200,7 @@ export type OrderItem = {
 export type OrderWithItems = Order & { order_items: OrderItem[] };
 
 /** Customer-facing order from get_order(): no admin fields. */
-export type PublicOrder = Omit<Order, "admin_note" | "customer_id" | "payment_proof"> & {
+export type PublicOrder = Omit<Order, "admin_note" | "customer_id" | "payment_proof" | "referrer_cashback" | "referrer_cashback_paid"> & {
   has_payment_proof: boolean;
   items: Pick<OrderItem, "id" | "kind" | "name" | "image" | "unit" | "unit_price" | "qty" | "line_total">[];
 };

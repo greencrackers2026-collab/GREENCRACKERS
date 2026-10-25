@@ -6,6 +6,7 @@ const LINKS = [
   { href: "/admin/quotes", label: "Quotes", short: "Quotes", icon: "💬" },
   { href: "/admin/products", label: "Products", short: "Products", icon: "🎆" },
   { href: "/admin/offers", label: "Offers & Settings", short: "Offers", icon: "🏷️" },
+  { href: "/admin/referrals", label: "Refer & Earn", short: "Refer", icon: "🎁" },
   { href: "/admin/customers", label: "Customers", short: "Customers", icon: "👥" },
 ];
 
@@ -22,7 +23,7 @@ export function AdminNav({ newOrders, newQuotes, variant }: { newOrders: number;
     return (
       <nav
         aria-label="Admin"
-        className="glass-strong no-print fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-x-0 border-b-0 pb-[env(safe-area-inset-bottom)] lg:hidden"
+        className="glass-strong no-print fixed inset-x-0 bottom-0 z-40 grid grid-cols-7 border-x-0 border-b-0 pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
         {items.map((l) => (
           <Link

@@ -277,7 +277,10 @@ export function CheckoutClient({ s }: { s: SiteSettings }) {
                     <span className="block font-semibold">{PAYMENT_METHOD_LABEL[m]}</span>
                     <span className="text-sm text-white/65">
                       {m === "UPI" && "Scan our UPI QR, pay, and upload the payment screenshot. Your order is confirmed after we verify it."}
-                      {m === "COD" && `Pay in cash when your order arrives. ₹${s.cod_fee} extra COD charges apply.`}
+                      {m === "COD" &&
+                        (quote?.referral
+                          ? "Pay in cash when your order arrives. No COD charges with your referral code 🎁"
+                          : `Pay in cash when your order arrives. ₹${s.cod_fee} extra COD charges apply.`)}
                     </span>
                   </span>
                 </label>
@@ -364,7 +367,7 @@ export function CheckoutClient({ s }: { s: SiteSettings }) {
 
           <div>
             <label htmlFor="coupon" className="label">
-              Coupon code
+              {s.referral_enabled ? "Coupon or referral code" : "Coupon code"}
             </label>
             <div className="flex gap-2">
               <input
@@ -409,6 +412,9 @@ export function CheckoutClient({ s }: { s: SiteSettings }) {
             <Row label="Sale price" value={quote ? formatINR(quote.subtotal) : "…"} />
             {quote && quote.auto_discount > 0 && <Row label={`Extra ${s.auto_offer_percent}% off`} value={`− ${formatINR(quote.auto_discount)}`} green />}
             <Row label="Delivery" value={quote ? (quote.shipping_fee ? formatINR(quote.shipping_fee) : "FREE") : "…"} />
+            {quote?.referral && quote.referral_waiver > 0 && (
+              <Row label={`Referral (${quote.coupon_code})`} value={`${formatINR(quote.referral_waiver)} delivery + COD waived`} green />
+            )}
             {quote && quote.coupon_discount > 0 && <Row label={`Coupon (${quote.coupon_code})`} value={`− ${formatINR(quote.coupon_discount)}`} green />}
             {quote && quote.cod_fee > 0 && <Row label="COD charges" value={formatINR(quote.cod_fee)} />}
             <div className="flex justify-between border-t border-white/10 pt-3 text-lg font-bold">

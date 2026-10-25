@@ -23,7 +23,12 @@ export function ordersQuery(f: OrderFilters, opts: { count?: boolean } = {}) {
   return q;
 }
 
-export async function updateOrder(id: string, patch: Partial<Pick<Order, "status" | "payment_status" | "admin_note">>) {
+export async function updateOrder(
+  id: string,
+  patch: Partial<
+    Pick<Order, "status" | "payment_status" | "admin_note" | "referrer_cashback" | "referrer_cashback_paid" | "friend_cashback" | "friend_cashback_paid">
+  >,
+) {
   // Cancelling restocks the items and locks the order (database trigger).
   must(await supabase.from("orders").update(patch).eq("id", id));
 }
@@ -65,6 +70,7 @@ export function downloadOrdersCsv(orders: OrderWithItems[], maps: CostMaps) {
     "Order No", "Date", "Status", "Payment Method", "Payment Status", "Name", "Phone", "Email",
     "Address 1", "Address 2", "City", "State", "Pincode", "Delivery Mode", "Items", "Subtotal",
     "Coupon", "Coupon Discount", "Auto Discount", "Shipping", "COD Fee", "Total", "Cost", "Profit", "UPI Ref", "Notes",
+    "Referral Code", "Referrer Cashback", "Referrer Paid", "Friend Cashback", "Friend Paid",
   ];
   const rows = orders.map((o) => {
     const pl = orderProfit(o, maps);
@@ -73,6 +79,7 @@ export function downloadOrdersCsv(orders: OrderWithItems[], maps: CostMaps) {
       o.address1, o.address2, o.city, o.state, o.pincode, o.delivery_mode,
       o.order_items.map((i) => `${i.name} x${i.qty}`).join("; "),
       o.subtotal, o.coupon_code, o.coupon_discount, o.auto_discount, o.shipping_fee, o.cod_fee, o.total, pl.cost, pl.profit, o.upi_ref, o.notes,
+      o.referral_code, o.referrer_cashback, o.referrer_cashback_paid ? "Yes" : "No", o.friend_cashback, o.friend_cashback_paid ? "Yes" : "No",
     ];
   });
   const csv = "﻿" + [header, ...rows].map((r) => r.map(esc).join(",")).join("\r\n");

@@ -163,6 +163,16 @@ export function OrderPage() {
             <dt>Delivery</dt>
             <dd>{order.shipping_fee ? formatINR(order.shipping_fee) : "FREE"}</dd>
           </div>
+          {order.referral_code && (
+            <div className="rounded-xl bg-fuchsia-500/10 p-2 text-fuchsia-100">
+              🎁 Referral code <b className="font-mono">{order.referral_code}</b>: FREE delivery + no COD charges.{" "}
+              {order.status === "CANCELLED"
+                ? ""
+                : order.friend_cashback_paid && order.friend_cashback > 0
+                  ? `${formatINR(order.friend_cashback)} cashback sent to you ✓`
+                  : `Up to ${formatINR(s.referral_friend_cashback_max)} cashback after delivery.`}
+            </div>
+          )}
           {order.cod_fee > 0 && (
             <div className="flex justify-between">
               <dt>COD charges</dt>

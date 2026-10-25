@@ -99,6 +99,38 @@ create table if not exists public.coupons (
   check (type <> 'PERCENT' or value <= 90)
 );
 
+-- Refer & earn: the admin creates one code per customer (the referrer) and sends it on WhatsApp.
+-- A friend who orders with it gets free delivery + no COD charges (+ cashback paid by the admin);
+-- the referrer earns cashback per referred order. Cashback amounts are recorded on the order.
+create table if not exists public.referral_codes (
+  id             uuid primary key default gen_random_uuid(),
+  code           text not null unique check (code ~ '^[A-Z0-9_-]{3,30}$'),
+  referrer_name  text not null check (char_length(referrer_name) between 2 and 80),
+  referrer_phone text not null unique check (referrer_phone ~ '^[6-9][0-9]{9}$'),
+  active         boolean not null default true,
+  expires_at     timestamptz,
+  usage_count    int not null default 0,
+  created_at     timestamptz not null default now()
+);
+
+-- Coupons and referral codes share the checkout code box, so a code can only exist in one of them.
+create or replace function public._code_not_taken() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if (tg_table_name = 'coupons' and exists (select 1 from public.referral_codes where code = new.code))
+     or (tg_table_name = 'referral_codes' and exists (select 1 from public.coupons where code = new.code)) then
+    raise exception 'Code % is already used by a %.', new.code,
+      case tg_table_name when 'coupons' then 'referral code' else 'coupon' end;
+  end if;
+  return new;
+end $$;
+drop trigger if exists coupons_code_not_taken on public.coupons;
+create trigger coupons_code_not_taken before insert or update of code on public.coupons
+  for each row execute function public._code_not_taken();
+drop trigger if exists referral_codes_code_not_taken on public.referral_codes;
+create trigger referral_codes_code_not_taken before insert or update of code on public.referral_codes
+  for each row execute function public._code_not_taken();
+
 -- ───────────────────────────── Orders ─────────────────────────────
 
 create table if not exists public.customers (
@@ -147,6 +179,14 @@ create table if not exists public.orders (
 create index if not exists orders_created_at_idx on public.orders (created_at desc);
 create index if not exists orders_status_idx on public.orders (status);
 create index if not exists orders_customer_idx on public.orders (customer_id);
+
+-- Refer & earn (added later, so as columns that are safe to re-run)
+alter table public.orders add column if not exists referral_code          text;
+alter table public.orders add column if not exists referrer_cashback      int not null default 0 check (referrer_cashback >= 0);
+alter table public.orders add column if not exists friend_cashback        int not null default 0 check (friend_cashback >= 0);
+alter table public.orders add column if not exists referrer_cashback_paid boolean not null default false;
+alter table public.orders add column if not exists friend_cashback_paid   boolean not null default false;
+create index if not exists orders_referral_code_idx on public.orders (referral_code) where referral_code is not null;
 
 create table if not exists public.order_items (
   id         uuid primary key default gen_random_uuid(),
@@ -214,6 +254,12 @@ create table if not exists public.settings (
   updated_at               timestamptz not null default now()
 );
 -- The single settings row is created by seed.sql (edit it later in Admin → Offers & Settings).
+
+-- Refer & earn rules
+alter table public.settings add column if not exists referral_enabled             boolean not null default true;
+alter table public.settings add column if not exists referral_min_order           int not null default 1999 check (referral_min_order >= 0);
+alter table public.settings add column if not exists referral_reward_max          int not null default 1000 check (referral_reward_max >= 0);
+alter table public.settings add column if not exists referral_friend_cashback_max int not null default 100 check (referral_friend_cashback_max >= 0);
 
 -- ───────────────────────────── updated_at triggers ─────────────────────────────
 
@@ -330,6 +376,9 @@ declare
   v_coupon_code     text;
   v_coupon_discount int := 0;
   v_coupon_message  text;
+  rf                public.referral_codes;
+  v_referral        boolean := false; -- a valid referral code was applied
+  v_waiver          int := 0;         -- delivery + COD charges waived by the referral code
   v_auto            int := 0;
   v_cod             int := 0;
   r                 record;
@@ -401,9 +450,27 @@ begin
     else s.shipping_fee end;
 
   -- Coupon (FREESHIP coupons waive the delivery fee; it shows as a coupon discount)
+  -- or referral code (waives delivery + COD charges; cashback is paid later by the admin).
   if v_code <> '' then
     select * into cp from public.coupons where code = v_code;
-    if not found or not cp.active then
+    if cp.id is null then
+      select * into rf from public.referral_codes where code = v_code;
+    end if;
+    if rf.id is not null then
+      if not s.referral_enabled or not rf.active then
+        v_coupon_message := 'This referral code is not active.';
+      elsif rf.expires_at is not null and rf.expires_at < now() then
+        v_coupon_message := 'This referral code has expired.';
+      elsif v_subtotal < s.referral_min_order then
+        v_coupon_message := format('Add items worth ₹%s more to use referral code %s (min order ₹%s).',
+                                   s.referral_min_order - v_subtotal, v_code, s.referral_min_order);
+      else
+        v_referral := true;
+        v_coupon_code := rf.code;
+        v_coupon_message := format('Referral code %s applied: FREE delivery, no COD charges and up to ₹%s cashback after delivery.',
+                                   rf.code, s.referral_friend_cashback_max);
+      end if;
+    elsif cp.id is null or not cp.active then
       v_coupon_message := 'Invalid coupon code.';
     elsif cp.expires_at is not null and cp.expires_at < now() then
       v_coupon_message := 'This coupon has expired.';
@@ -434,6 +501,12 @@ begin
     v_cod := s.cod_fee;
   end if;
 
+  if v_referral then
+    v_waiver := v_shipping + v_cod;
+    v_shipping := 0;
+    v_cod := 0;
+  end if;
+
   return jsonb_build_object(
     'lines', v_lines,
     'errors', to_jsonb(v_errors),
@@ -446,7 +519,9 @@ begin
     'shipping_fee', v_shipping,
     'cod_fee', v_cod,
     'total', greatest(0, v_subtotal - v_coupon_discount - v_auto + v_shipping + v_cod),
-    'savings', v_mrp_total - v_subtotal + v_coupon_discount + v_auto,
+    'savings', v_mrp_total - v_subtotal + v_coupon_discount + v_auto + v_waiver,
+    'referral', v_referral,
+    'referral_waiver', v_waiver,
     'meets_minimum', v_subtotal >= s.min_order_value
   );
 end $$;
@@ -483,6 +558,7 @@ declare
   v_customer uuid;
   v_order    uuid;
   v_number   text;
+  v_referral boolean;
   r          record;
 begin
   perform public._rate_limit('order', 10, interval '10 minutes');
@@ -532,6 +608,15 @@ begin
   if v_coupon is not null and q ->> 'coupon_code' is null then
     raise exception '%', coalesce(q ->> 'coupon_message', 'Coupon is not valid.');
   end if;
+  v_referral := (q ->> 'referral')::boolean;
+  if v_referral then
+    if exists (select 1 from public.referral_codes where code = q ->> 'coupon_code' and referrer_phone = v_phone) then
+      raise exception 'You can''t use your own referral code. Share it with your friends instead!';
+    end if;
+    if exists (select 1 from public.orders where phone = v_phone and referral_code is not null and status <> 'CANCELLED') then
+      raise exception 'A referral code has already been used with this mobile number. Please remove it to continue.';
+    end if;
+  end if;
 
   -- Conditional decrement guards against overselling under concurrency; any failure rolls back the whole order.
   for r in
@@ -555,7 +640,9 @@ begin
     set name = excluded.name, email = coalesce(excluded.email, public.customers.email), city = excluded.city
   returning id into v_customer;
 
-  if q ->> 'coupon_code' is not null then
+  if v_referral then
+    update public.referral_codes set usage_count = usage_count + 1 where code = q ->> 'coupon_code';
+  elsif q ->> 'coupon_code' is not null then
     update public.coupons set usage_count = usage_count + 1 where code = q ->> 'coupon_code';
   end if;
 
@@ -566,11 +653,13 @@ begin
 
   insert into public.orders (
     order_number, customer_id, name, phone, email, address1, address2, city, state, pincode, notes, delivery_mode,
-    subtotal, mrp_total, coupon_code, coupon_discount, auto_discount, shipping_fee, cod_fee, total,
+    subtotal, mrp_total, coupon_code, referral_code, coupon_discount, auto_discount, shipping_fee, cod_fee, total,
     payment_method, payment_status, upi_ref, payment_proof
   ) values (
     v_number, v_customer, v_name, v_phone, v_email, v_address1, v_address2, v_city, v_state, v_pincode, v_notes, v_mode,
-    (q ->> 'subtotal')::int, (q ->> 'mrp_total')::int, q ->> 'coupon_code', (q ->> 'coupon_discount')::int,
+    (q ->> 'subtotal')::int, (q ->> 'mrp_total')::int,
+    case when v_referral then null else q ->> 'coupon_code' end, case when v_referral then q ->> 'coupon_code' end,
+    (q ->> 'coupon_discount')::int,
     (q ->> 'auto_discount')::int, (q ->> 'shipping_fee')::int, (q ->> 'cod_fee')::int, (q ->> 'total')::int,
     -- UPI orders wait for the admin to check the screenshot before they are confirmed.
     v_method, case when v_method = 'UPI' then 'AWAITING_VERIFICATION' else 'PENDING' end,
@@ -597,7 +686,8 @@ end $$;
 -- Public order page. Anyone with the (unguessable) order id can view it; internal fields are left out.
 create or replace function public.get_order(p_id uuid) returns jsonb
 language sql stable security definer set search_path = '' as $$
-  select (to_jsonb(o) - 'admin_note' - 'customer_id' - 'payment_proof') || jsonb_build_object(
+  select (to_jsonb(o) - 'admin_note' - 'customer_id' - 'payment_proof'
+          - 'referrer_cashback' - 'referrer_cashback_paid') || jsonb_build_object(
     'has_payment_proof', o.payment_proof is not null,
     'items', coalesce((
       select jsonb_agg(jsonb_build_object(
@@ -726,6 +816,7 @@ alter table public.product_costs enable row level security;
 alter table public.combos        enable row level security;
 alter table public.combo_items   enable row level security;
 alter table public.coupons       enable row level security;
+alter table public.referral_codes enable row level security;
 alter table public.customers     enable row level security;
 alter table public.orders        enable row level security;
 alter table public.order_items   enable row level security;
@@ -770,7 +861,7 @@ create policy "anyone submits a quote" on public.quotes for insert to anon, auth
 do $$
 declare t text;
 begin
-  foreach t in array array['coupons', 'customers', 'orders', 'order_items', 'quotes'] loop
+  foreach t in array array['coupons', 'referral_codes', 'customers', 'orders', 'order_items', 'quotes'] loop
     execute format('drop policy if exists "admins manage %1$s" on public.%1$I', t);
     execute format('create policy "admins manage %1$s" on public.%1$I for all to authenticated
                     using (public.is_admin()) with check (public.is_admin())', t);
@@ -782,6 +873,7 @@ end $$;
 revoke all on function public._touch_updated_at() from public, anon, authenticated;
 revoke all on function public._rate_limit(text, int, interval) from public, anon, authenticated;
 revoke all on function public._quotes_rate_limit() from public, anon, authenticated;
+revoke all on function public._code_not_taken() from public, anon, authenticated;
 revoke all on function public._pincode_error(text, text, text) from public, anon, authenticated;
 revoke all on function public._proof_available(text, uuid) from public, anon, authenticated;
 revoke all on function public._orders_before_update() from public, anon, authenticated;

@@ -10,6 +10,7 @@ import { AdminProducts } from "./Products";
 import { EditProduct } from "./ProductEdit";
 import { OffersPage } from "./Offers";
 import { CustomersPage } from "./Customers";
+import { ReferralsPage } from "./Referrals";
 import { PrintPage } from "./Print";
 import { NotFound } from "@/pages/site/NotFound";
 
@@ -41,6 +42,7 @@ export default function AdminRoutes() {
           <Route path="products" element={<AdminProducts />} />
           <Route path="products/:id" element={<EditProduct />} />
           <Route path="offers" element={<OffersPage />} />
+          <Route path="referrals" element={<ReferralsPage />} />
           <Route path="customers" element={<CustomersPage />} />
           <Route path="*" element={<NotFound />} />
         </Route>

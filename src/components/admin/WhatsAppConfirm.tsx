@@ -30,6 +30,7 @@ export function confirmationMessage(o: OrderWithItems, storeName: string) {
     `Delivery: ${o.shipping_fee ? formatINR(o.shipping_fee) : "FREE"}`,
     ...(o.cod_fee ? [`COD charges: ${formatINR(o.cod_fee)}`] : []),
     `*Total: ${formatINR(o.total)}*`,
+    ...(o.referral_code ? [`🎁 Referral code ${o.referral_code}: FREE delivery + no COD charges. Your cashback comes after delivery.`] : []),
     "",
     `*Payment:* ${payment}`,
     `*${o.delivery_mode === "PICKUP" ? "Pickup" : "Delivery to"}:* ${delivery}`,

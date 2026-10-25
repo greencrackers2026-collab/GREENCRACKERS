@@ -4,13 +4,16 @@ import { markCodPaid, reviewPayment, updateOrder } from "@/lib/admin";
 import { supabase } from "@/lib/supabase";
 import { must, useLoad } from "@/lib/useLoad";
 import { ORDER_STATUSES, PAYMENT_METHOD_LABEL, PAYMENT_STATUSES } from "@/lib/constants";
-import { formatDateTime, formatINR } from "@/lib/format";
+import { formatDateTime, formatINR, waLink } from "@/lib/format";
 import { getCostMaps, itemUnitCost, orderProfit } from "@/lib/profit";
-import type { OrderWithItems } from "@/lib/types";
+import { friendCashbackMessage, referrerCashbackMessage } from "@/lib/referral";
+import { useStore } from "@/lib/store";
+import type { OrderWithItems, ReferralCode } from "@/lib/types";
 import { PageTitle, StatusBadge } from "@/components/admin/ui";
 import { ActionButton, LoadState } from "@/components/admin/FormBits";
 import { DeleteOrderButton } from "@/components/admin/DeleteOrderButton";
 import { WhatsAppConfirmButton } from "@/components/admin/WhatsAppConfirm";
+import { WhatsAppIcon } from "@/components/ui/Icons";
 import { NotFound } from "@/pages/site/NotFound";
 import { useAdminOutlet } from "./AdminLayout";
 
@@ -21,12 +24,19 @@ async function loadOrder(id: string) {
   ]);
   const o = must(res) as OrderWithItems | null;
   if (!o) return null;
-  const [orderCount, proof] = await Promise.all([
+  const [orderCount, proof, referral] = await Promise.all([
     o.customer_id ? supabase.from("orders").select("id", { count: "exact", head: true }).eq("customer_id", o.customer_id) : null,
     // Screenshots live in a private bucket; a short-lived signed URL lets the admin view them.
     o.payment_proof ? supabase.storage.from("payment-proofs").createSignedUrl(o.payment_proof, 3600) : null,
+    o.referral_code ? supabase.from("referral_codes").select("*").eq("code", o.referral_code).maybeSingle() : null,
   ]);
-  return { o, maps, customerOrders: orderCount?.count ?? null, proofUrl: proof?.data?.signedUrl ?? null };
+  return {
+    o,
+    maps,
+    customerOrders: orderCount?.count ?? null,
+    proofUrl: proof?.data?.signedUrl ?? null,
+    referrer: (referral?.data as ReferralCode | null | undefined) ?? null,
+  };
 }
 
 export function OrderDetail() {
@@ -146,7 +156,9 @@ export function OrderDetail() {
               </div>
               <div><dt className="text-white/55">Margin</dt><dd className="text-lg font-bold">{pl.margin.toFixed(1)}%</dd></div>
             </dl>
-            <p className="mt-2 text-xs text-white/50">Revenue = items after discounts (delivery fee excluded).</p>
+            <p className="mt-2 text-xs text-white/50">
+              Revenue = items after discounts (delivery fee excluded).{pl.cashback > 0 && ` Profit is after ${formatINR(pl.cashback)} referral cashback.`}
+            </p>
             {pl.missing && <p className="mt-1 text-xs text-saffron-400">Some items have no cost price, so profit is overstated. Set costs in Products.</p>}
           </section>
 
@@ -273,6 +285,7 @@ export function OrderDetail() {
               )}
             </section>
           )}
+          {o.referral_code && <ReferralCashback key={o.updated_at} o={o} referrer={data.referrer} onSaved={after} />}
           <UpdateOrderForm key={o.updated_at} o={o} onSaved={after} />
         </div>
       </div>
@@ -325,6 +338,85 @@ function UpdateOrderForm({ o, onSaved }: { o: OrderWithItems; onSaved: () => Pro
         </ActionButton>
         <p className="text-xs text-white/50">Setting status to CANCELLED returns the items to stock.</p>
       </div>
+    </section>
+  );
+}
+
+function ReferralCashback({ o, referrer, onSaved }: { o: OrderWithItems; referrer: ReferralCode | null; onSaved: () => Promise<void> }) {
+  const { settings } = useStore();
+  const [refAmt, setRefAmt] = useState(o.referrer_cashback ? String(o.referrer_cashback) : "");
+  const [refPaid, setRefPaid] = useState(o.referrer_cashback_paid);
+  const [friendAmt, setFriendAmt] = useState(o.friend_cashback ? String(o.friend_cashback) : "");
+  const [friendPaid, setFriendPaid] = useState(o.friend_cashback_paid);
+  const amount = (v: string, max: number) => Math.min(max, Math.max(0, parseInt(v, 10) || 0));
+  const waBtn = "btn bg-[#25D366] text-sm text-[#06290f]";
+
+  return (
+    <section className="glass rounded-2xl p-5 text-sm" aria-labelledby="ref-title">
+      <h2 id="ref-title" className="font-semibold">
+        🎁 Refer &amp; earn cashback
+      </h2>
+      <p className="mt-1 text-white/60">
+        Code <b className="font-mono text-gold-300">{o.referral_code}</b>
+        {referrer ? (
+          <>
+            {" "}from <b>{referrer.referrer_name}</b> ({referrer.referrer_phone})
+          </>
+        ) : (
+          " (code was deleted)"
+        )}
+        . Pay cashback once the order is delivered.
+      </p>
+      {o.status === "CANCELLED" && <p className="mt-2 text-red-300">Order cancelled: no cashback is due.</p>}
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+        {referrer && (
+          <fieldset className="rounded-xl bg-white/5 p-3">
+            <legend className="sr-only">Referrer cashback</legend>
+            <label className="block">
+              <span className="label">Referrer cashback (up to {formatINR(settings.referral_reward_max)})</span>
+              <input type="number" min={0} max={settings.referral_reward_max} className="input" value={refAmt} onChange={(e) => setRefAmt(e.target.value)} placeholder="₹" />
+            </label>
+            <label className="mt-2 flex items-center gap-2">
+              <input type="checkbox" checked={refPaid} onChange={(e) => setRefPaid(e.target.checked)} className="h-5 w-5 accent-amber-400" /> Paid to {referrer.referrer_name}
+            </label>
+            {o.referrer_cashback > 0 && o.referrer_cashback_paid && (
+              <a href={waLink(`91${referrer.referrer_phone}`, referrerCashbackMessage(referrer, o, settings.store_name))} target="_blank" rel="noopener noreferrer" className={`${waBtn} mt-3 w-full`}>
+                <WhatsAppIcon width={18} height={18} /> Tell {referrer.referrer_name}
+              </a>
+            )}
+          </fieldset>
+        )}
+        <fieldset className="rounded-xl bg-white/5 p-3">
+          <legend className="sr-only">Friend cashback</legend>
+          <label className="block">
+            <span className="label">Friend cashback (up to {formatINR(settings.referral_friend_cashback_max)})</span>
+            <input type="number" min={0} max={settings.referral_friend_cashback_max} className="input" value={friendAmt} onChange={(e) => setFriendAmt(e.target.value)} placeholder="₹" />
+          </label>
+          <label className="mt-2 flex items-center gap-2">
+            <input type="checkbox" checked={friendPaid} onChange={(e) => setFriendPaid(e.target.checked)} className="h-5 w-5 accent-amber-400" /> Paid to {o.name}
+          </label>
+          {o.friend_cashback > 0 && o.friend_cashback_paid && (
+            <a href={waLink(`91${o.phone}`, friendCashbackMessage(o, settings.store_name))} target="_blank" rel="noopener noreferrer" className={`${waBtn} mt-3 w-full`}>
+              <WhatsAppIcon width={18} height={18} /> Tell {o.name}
+            </a>
+          )}
+        </fieldset>
+      </div>
+      <ActionButton
+        className="btn btn-primary mt-4 w-full"
+        onClick={async () => {
+          await updateOrder(o.id, {
+            referrer_cashback: amount(refAmt, settings.referral_reward_max),
+            referrer_cashback_paid: refPaid,
+            friend_cashback: amount(friendAmt, settings.referral_friend_cashback_max),
+            friend_cashback_paid: friendPaid,
+          });
+          await onSaved();
+        }}
+      >
+        Save cashback
+      </ActionButton>
+      <p className="mt-2 text-xs text-white/50">Send the cashback by UPI to their mobile number, tick “Paid”, save, then tap the WhatsApp button to let them know.</p>
     </section>
   );
 }

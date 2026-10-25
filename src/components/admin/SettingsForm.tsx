@@ -93,6 +93,10 @@ export function SettingsForm({ v, onSaved }: { v: Settings; onSaved: () => Promi
         blocked_pincode_prefixes: str("blocked_pincode_prefixes").replace(/[^\d,]/g, ""),
         serviceable_prefixes: str("serviceable_prefixes").replace(/[^\d,]/g, ""),
         seo_cities: str("seo_cities"),
+        referral_enabled: bool("referral_enabled"),
+        referral_min_order: Math.max(0, int("referral_min_order")),
+        referral_reward_max: Math.max(0, int("referral_reward_max")),
+        referral_friend_cashback_max: Math.max(0, int("referral_friend_cashback_max")),
       })
       .eq("id", 1);
     setPending(false);
@@ -150,6 +154,22 @@ export function SettingsForm({ v, onSaved }: { v: Settings; onSaved: () => Promi
         </Field>
         <Field label="Minimum order value (₹)">
           <input name="min_order_value" type="number" min={0} className="input" defaultValue={v.min_order_value} />
+        </Field>
+      </section>
+
+      <section className={section}>
+        <h2 className={h}>Refer &amp; earn</h2>
+        <div className="sm:col-span-2">
+          <Check name="referral_enabled" label="Referral codes work at checkout" def={v.referral_enabled} />
+        </div>
+        <Field label="Minimum order for a referral (₹)" hint="Friend's sale-price total must be at least this">
+          <input name="referral_min_order" type="number" min={0} className="input" defaultValue={v.referral_min_order} />
+        </Field>
+        <Field label="Referrer cashback: up to (₹)" hint="Per referred order. Shown in the WhatsApp message">
+          <input name="referral_reward_max" type="number" min={0} className="input" defaultValue={v.referral_reward_max} />
+        </Field>
+        <Field label="Friend cashback: up to (₹)" hint="Friend also gets FREE delivery + no COD charges">
+          <input name="referral_friend_cashback_max" type="number" min={0} className="input" defaultValue={v.referral_friend_cashback_max} />
         </Field>
       </section>
 

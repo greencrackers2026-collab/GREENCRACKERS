@@ -295,6 +295,7 @@ function TotalCell({ o, maps }: { o: OrderWithItems; maps: CostMaps }) {
     <>
       <span className="font-semibold">{formatINR(o.total)}</span>
       {o.coupon_code && <span className="block text-xs text-festive-green">{o.coupon_code}</span>}
+      {o.referral_code && <span className="block text-xs text-fuchsia-300">🎁 {o.referral_code}</span>}
       <span className={`block text-xs ${pl.profit >= 0 ? "text-festive-green" : "text-red-300"}`} title="Profit after your cost">
         {pl.profit >= 0 ? "Profit " : "Loss "}
         {formatINR(Math.abs(pl.profit))}
